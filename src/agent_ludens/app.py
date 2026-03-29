@@ -5,9 +5,11 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
+import pathlib
 
 from agent_ludens.config import AgentSettings
 from agent_ludens.models import ActivityStatus, ErrorInfo, PeerRecord, RequestCreate
@@ -125,5 +127,12 @@ def create_app(settings: AgentSettings | None = None, runtime: AgentRuntime | No
     @app.post("/v1/peers", status_code=201)
     async def register_peer(peer: PeerRecord) -> dict[str, Any]:
         return runtime.store.upsert_peer(peer).model_dump(mode="json")
+
+    ui_dir = pathlib.Path(__file__).parent / "ui"
+    app.mount("/ui", StaticFiles(directory=str(ui_dir)), name="ui")
+
+    @app.get("/")
+    async def root() -> RedirectResponse:
+        return RedirectResponse(url="/ui/index.html")
 
     return app

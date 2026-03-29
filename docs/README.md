@@ -24,11 +24,10 @@ Production-ready v0 means:
 
 Production-ready v0 does **not** mean:
 
-- a web dashboard
 - marketplace delegation
 - tokens or wallets
 - multi-machine networking
-- any other Stage 2/3 roadmap work
+- any other Stage 3 roadmap work
 
 ## Current Codex CLI contract
 

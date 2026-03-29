@@ -7,10 +7,10 @@ Codex-driven activity at a time.
 
 Production-ready v0 is intentionally **Stage 1 only**.
 
-- **Included in the production-ready v0 contract:** local API, durable SQLite queue +
+- **Included in the production-ready contract:** local API, durable SQLite queue +
   filesystem activity state, single-slot supervisor loop, fake and real Codex adapters,
-  peer request submit+poll, and file-backed observability.
-- **Deferred:** owner web UI, frontend event feed, marketplace/delegation economy,
+  peer request submit+poll, file-backed observability, and an integrated Owner Web Interface.
+- **Deferred:** marketplace/delegation economy,
   token system, and multi-machine networking.
 
 Validated against the locally installed Codex CLI on **March 29, 2026**:
@@ -33,7 +33,6 @@ Agent Ludens v0 must provide:
 
 Agent Ludens v0 does **not** include:
 
-- an owner-facing web dashboard
 - a marketplace / job board / delegation economy
 - public internet exposure
 - multiple simultaneous Codex turns inside one runtime
@@ -129,5 +128,4 @@ should either pass them or record a specific live-environment blocker in the rel
 
 ## Roadmap boundary
 
-Stage 2 (owner UI) and Stage 3 (marketplace/delegation economy) remain visible as roadmap
-ideas, but they are **not** part of the production-ready v0 contract.
+Stage 2 (owner UI) has been completed and integrated into the project. Stage 3 (marketplace/delegation economy) remains visible as a roadmap idea, but it is **not** part of the production-ready contract.

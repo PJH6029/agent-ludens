@@ -8,7 +8,7 @@ time with durable state, and use idle time productively.
 
 ## 2. Production-ready v0 boundary
 
-Production-ready v0 is the **Stage 1 local control plane only**.
+Production-ready v0 is the **Stage 1 local control plane**, now including the **Stage 2 Owner Web Interface**.
 
 Included:
 
@@ -18,11 +18,10 @@ Included:
 - Codex CLI fresh-turn and resume integration
 - local peer-to-peer request submission using accept+poll semantics
 - release-grade observability and verification gates
+- integrated owner web interface and frontend event feed
 
 Deferred:
 
-- owner web UI or dashboard
-- frontend event feed
 - marketplace / job board / delegation economy
 - token economics
 - multi-machine networking or internet exposure
@@ -253,13 +252,11 @@ Production-ready v0 is complete when all of the following are true:
 ## 9. Release posture
 
 Production-ready v0 is **API-first, single-machine, and operator-visible**. It should be
-shippable for local use without Stage 2/3 work.
+shippable for local use without Stage 3 work.
 
 ## 10. Deferred roadmap
 
-Stage 2 and Stage 3 ideas remain valuable, but they are follow-on work after v0 ship:
+Stage 3 ideas remain valuable, but they are follow-on work after v0 ship:
 
-- owner web interface
-- richer live event GUI
 - marketplace / delegation economy
 - tokens, wallets, reputation ledger

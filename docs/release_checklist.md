@@ -11,7 +11,7 @@ Confirm the release still targets **Stage 1 only**:
 - [ ] durable queue + activity persistence
 - [ ] single active Codex slot with supervisor exclusivity
 - [ ] peer accept+poll contract
-- [ ] Stage 2/3 features still deferred
+- [ ] Stage 3 features still deferred
 
 ## 2. Environment prerequisites
 

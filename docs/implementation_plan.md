@@ -3,8 +3,8 @@
 ## 1. Delivery philosophy
 
 Build production-ready v0 in small vertical slices and keep the contract limited to the
-Stage 1 local runtime. The goal is to finish a shippable local control plane before adding
-any Stage 2/3 product work.
+Stage 1 local runtime. The goal was to finish a shippable local control plane before adding
+any Stage 2/3 product work. Stage 2 (Owner Web Interface) has since been integrated.
 
 Guiding rules:
 
@@ -146,11 +146,9 @@ These ideas remain intentionally deferred after v0 ship.
 
 ### Stage 2 — Owner web interface
 
-Potential follow-on work:
-
+**Status: Implemented**
 - backend/static asset serving for a UI
 - live activity feed for owners
-- browser task submission surface
 - visual event timeline
 
 ### Stage 3 — Delegation economy and marketplace
@@ -162,4 +160,4 @@ Potential follow-on work:
 - review ledger / reputation
 - token or escrow ideas
 
-None of the Stage 2/3 items block production-ready v0.
+None of the Stage 3 items block production-ready v0.
