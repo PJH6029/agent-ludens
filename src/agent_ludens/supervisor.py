@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import os
 from itertools import cycle
 from pathlib import Path
 from typing import Any
@@ -63,17 +65,24 @@ class AgentRuntime:
         self._current_activity_id: str | None = None
         self._current_session_id: str | None = None
         self._current_run_task: asyncio.Task[None] | None = None
+        self._supervisor_lock_held = False
         self._free_time_cycle = cycle(
             [Namespace.PREPARATION, Namespace.COMMUNITY, Namespace.MAINTENANCE]
         )
 
     async def start(self) -> None:
         self.activity_manager.ensure_layout()
-        self._recover_state()
-        await self._write_runtime_state()
-        if self.settings.enable_supervisor and self._loop_task is None:
-            self._stopping = False
-            self._loop_task = asyncio.create_task(self._run_loop())
+        try:
+            if self.settings.enable_supervisor:
+                self._acquire_supervisor_lock()
+            self._recover_state()
+            await self._write_runtime_state()
+            if self.settings.enable_supervisor and self._loop_task is None:
+                self._stopping = False
+                self._loop_task = asyncio.create_task(self._run_loop())
+        except Exception:
+            self._release_supervisor_lock()
+            raise
 
     async def shutdown(self) -> None:
         self._stopping = True
@@ -89,6 +98,7 @@ class AgentRuntime:
             self._loop_task = None
         self._status = AgentStatus.IDLE
         await self._write_runtime_state()
+        self._release_supervisor_lock()
 
     def wakeup(self) -> None:
         self._wakeup.set()
@@ -143,6 +153,9 @@ class AgentRuntime:
             checkpoint_version=activity.checkpoint_version,
             updated_at=activity.updated_at,
         )
+
+    def list_recent_events(self, *, limit: int = 50) -> list[dict[str, Any]]:
+        return self.activity_manager.read_recent_events(limit=limit)
 
     def _read_text(self, path: str) -> str:
         return Path(path).read_text(encoding="utf-8")
