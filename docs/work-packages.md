@@ -2,266 +2,225 @@
 
 ## 1. Purpose
 
-This document breaks the project into execution-ready work packages so later agents can plan and implement in parallel without inventing the system structure.
+This document turns the repaired `docs/` contract into an execution-ready delivery order.
+
+The work packages are intentionally staged so the project does not race into adapter or UI polish before the contract, replay model, and verification scaffolding are sound.
 
 ## 2. Dependency Order
 
 Recommended high-level order:
+1. docs audit and architecture decision gate
+2. docs repair and release-gate definition
+3. test/fixture scaffolding
+4. core runtime, reducer/materializer, storage, auth, recovery
+5. API, WebSocket, CLI
+6. browser UI completion
+7. Codex adapter
+8. Claude adapter
+9. OpenCode adapter
+10. hardening, performance, and release validation
 
-1. shared schemas and config
-2. event store and session manager
-3. server API and WebSocket layer
-4. browser UI shell
-5. Codex adapter
-6. Claude adapter
-7. OpenCode adapter
-8. testing and live validation
-9. packaging and polish
-
-## 3. Work Package A: Project Skeleton
-
-Scope:
-
-- initialize source layout
-- add lint, typecheck, test, and build tooling
-- establish shared runtime validation and schema utilities
-
-Deliverables:
-
-- working package scripts
-- shared type and schema modules
-- logging utility
-- error utility
-
-Exit criteria:
-
-- `npm run lint`
-- `npm run typecheck`
-- `npm run test:unit` with at least baseline schema tests
-
-## 4. Work Package B: Config And Storage Layer
+## 3. Work Package A — Docs Audit And Architecture Gate
 
 Scope:
-
-- config loader
-- config validator
-- storage root helper
-- snapshot read and write
-- event log append and replay
-- active session index
+- compare every spec document with current code reality
+- resolve ambiguities and missing requirements
+- decide whether the current Fastify + modular SPA architecture remains the production baseline
 
 Deliverables:
-
-- config module
-- storage module
-- retention module
+- resolved gap matrix
+- explicit keep-vs-refactor decision
+- updated production constraints that will govern implementation
 
 Exit criteria:
+- every critical docs/code gap has an owner: normative requirement, explicit de-scope, or architecture decision
+- the architecture decision gate is recorded before broad implementation continues
 
-- config validation tests pass
-- snapshot and event replay tests pass
-- crash-safe append behavior is covered by tests
-
-## 5. Work Package C: Core Session Runtime
+## 4. Work Package B — Docs Repair
 
 Scope:
-
-- session manager
-- event bus
-- session materializer or reducer
-- pending action lifecycle
-- mode and policy transition logic
+- update all `docs/*.md` so the contract is internally consistent, execution-ready, and release-ready
+- define prepared-environment live semantics
+- split minimum releasable adapter transport from optional attach/tmux affordances
 
 Deliverables:
-
-- session service with create, message, mode, policy, resolve, terminate
-- normalized session state machine
+- revised docs set
+- explicit release gate
+- implementation steps and milestone ordering aligned with this document
 
 Exit criteria:
+- docs are sufficient for implementation without hidden assumptions
+- release evidence requirements are explicit
 
-- fake-adapter integration tests cover all core flows
-- state rebuild from events works deterministically
-
-## 6. Work Package D: HTTP API And WebSocket
+## 5. Work Package C — Test And Fixture Scaffolding
 
 Scope:
-
-- health route
-- agents route
-- sessions routes
-- settings route
-- doctor route
-- WebSocket subscription and resume behavior
+- add missing unit/integration fixtures
+- establish Playwright E2E scaffolding
+- establish live-test workspace helpers and per-adapter prerequisite checks
 
 Deliverables:
-
-- complete API contract from [api.md](./api.md)
-- request validation
-- response envelopes
-- auth middleware
+- reusable fake adapter harness
+- daemon launcher and websocket helpers
+- initial Playwright suite structure
+- live-test helpers and prepared-environment checks
 
 Exit criteria:
+- `npm run test:e2e` executes real tests instead of failing with “No tests found”
+- test helpers are ready before broad runtime/UI churn
 
-- API integration tests pass
-- WebSocket reconnect and cursor tests pass
-
-## 7. Work Package E: Browser UI Foundation
+## 6. Work Package D — Core Runtime And Storage
 
 Scope:
-
-- app shell
-- routing
-- connection management
-- dashboard
-- session workspace shell
-- settings and doctor shell
+- reducer/materializer implementation or refactor
+- session mutation serialization
+- durable event/snapshot/index handling
+- retention/pruning
+- auth hardening
+- recovery and adapter reconciliation hooks
 
 Deliverables:
-
-- browser app that can render static and fake-adapter driven data
+- stable session truth model
+- explicit replay/recovery logic
+- production-ready storage behaviors
 
 Exit criteria:
+- unit/integration suites cover idempotency, pending lifecycle, recovery, and terminate flows
+- replay truth is driven by one shared reducer/materializer model
 
-- Playwright can load dashboard and workspace against fake adapter flows
-
-## 8. Work Package F: Session Workspace UX
+## 7. Work Package E — HTTP API, WebSocket, And CLI
 
 Scope:
-
-- transcript rendering
-- composer
-- pending action cards
-- terminal mirror
-- metadata panel
-- mode and policy controls
+- full API contract from `api.md`
+- cursor/idempotency/restart semantics
+- websocket subscribe/replay behavior
+- CLI parity for required daemon and session flows
 
 Deliverables:
-
-- complete workspace interaction model
+- stable API and websocket contract
+- CLI flows that exercise the same runtime/storage model as the browser
 
 Exit criteria:
+- integration tests prove request validation, replay semantics, auth, and session control flows
 
-- browser E2E passes for create session, stream output, resolve pending action, and terminate
-
-## 9. Work Package G: Codex Adapter
+## 8. Work Package F — Browser UI Completion
 
 Scope:
-
-- Codex probe
-- per-session config generation
-- notify hook integration
-- session log relay
-- mode mapping
-- approval and sandbox mapping
-- tmux attach support
+- dashboard search/filter/readiness
+- complete workspace controls and metadata
+- settings and doctor clarity
+- reconnect behavior without duplication
+- accessibility and responsive behavior
 
 Deliverables:
-
-- fully functional Codex adapter with live-test coverage
+- complete browser UX for required product flows
 
 Exit criteria:
+- Playwright passes required dashboard/workspace/settings/reconnect flows
 
-- Codex integration tests pass
-- `npm run test:live -- --agent codex` can pass in a prepared environment
-
-## 10. Work Package H: Claude Adapter
+## 9. Work Package G — Codex Adapter
 
 Scope:
-
-- Claude binary and auth probe
-- per-session settings and hook generation
-- `PermissionRequest` handling
-- `SessionStart` and `SessionEnd` lifecycle mapping
-- plan-mode emulation through official hooks and permissions
-- tmux attach support
+- implement minimum releasable Codex transport using current official surfaces
+- support create/resume/message/mode/policy/pending/terminate flows
+- add truthful capability reporting and live-test coverage
 
 Deliverables:
-
-- fully functional Claude adapter with live-test coverage
+- production Codex adapter
+- Codex live validation path
 
 Exit criteria:
+- Codex is no longer probe-only
+- prepared-environment live validation can succeed
 
-- Claude integration tests pass
-- `npm run test:live -- --agent claude` can pass in a prepared environment
-
-## 11. Work Package I: OpenCode Adapter
+## 10. Work Package H — Claude Adapter
 
 Scope:
-
-- OpenCode probe
-- local server lifecycle management
-- session create and resume through official transport
-- built-in build and plan mapping
-- permission handling
-- optional attach behavior if transport supports it
+- implement minimum releasable Claude transport using official hooks/settings surfaces
+- emulate plan mode truthfully when native mode is unavailable
+- add truthful capability reporting and live-test coverage
 
 Deliverables:
-
-- fully functional OpenCode adapter with live-test coverage
+- production Claude adapter
+- Claude live validation path
 
 Exit criteria:
+- Claude is no longer probe-only
+- prepared-environment live validation can succeed
 
-- OpenCode integration tests pass
-- `npm run test:live -- --agent opencode` can pass in a prepared environment
-
-## 12. Work Package J: Doctor And Setup
+## 11. Work Package I — OpenCode Adapter
 
 Scope:
-
-- bootstrap command
-- daemon start and stop commands
-- doctor output in CLI and UI
-- remediation text for missing dependencies
+- implement minimum releasable OpenCode transport using official server/API surfaces
+- add prerequisite checks and honest capability reporting
+- add live validation path for prepared environments
 
 Deliverables:
-
-- first-run setup flow
-- `agents doctor`
-- `daemon status`
+- production OpenCode adapter
+- OpenCode live validation path
 
 Exit criteria:
+- OpenCode is no longer probe-only
+- prepared-environment live validation can succeed when prerequisites are installed
 
-- first-run setup works on a prepared machine
-- doctor surfaces blocked prerequisites clearly
-
-## 13. Work Package K: Hardening
+## 12. Work Package J — Hardening
 
 Scope:
-
-- reconnect behavior
-- restart recovery
-- retention and pruning
-- security review for auth and secret redaction
-- performance tuning for long transcripts
+- reconnect and daemon-restart polish
+- performance tuning for long histories
+- security review for auth, secrets, and capability reporting
+- observability and pruning verification
 
 Deliverables:
-
-- stable recoverability behavior
-- release-ready retention rules
+- release-ready recovery and diagnostics behavior
 
 Exit criteria:
+- required performance/recovery checks pass
+- required logs/metrics/counters are present and redacted correctly
 
-- reconnect and daemon restart browser E2E tests pass
-- manual validation checklist from [testing-and-live-validation.md](./testing-and-live-validation.md) is satisfied
+## 13. Parallelization Guidance
 
-## 14. Parallelization Guidance
+Safe parallel tracks begin only after Work Package B and preferably after Work Package C.
 
-Safe parallel tracks after Work Package C:
+Safe parallel lanes:
+- core runtime / API
+- browser UI
+- adapter implementation by vendor
+- release verification
 
-- API and WebSocket work
-- browser UI foundation
-- adapter implementation per vendor
+Shared rules:
+- all lanes depend on one reducer/materializer truth model
+- docs are frozen before broad parallel implementation begins
+- optional affordances such as attach/open-directory must not force cross-lane blockers
 
-Shared-contract rule:
+## 14. Final Release Checklist
 
-- all parallel tracks must depend on the same shared schemas and event types
-- adapter work must not fork the normalized contract
+The release checklist is complete only when all items below are checked:
 
-## 15. Final Release Checklist
+### Contract
+- [ ] `docs/` is internally consistent and aligned with shipped behavior
+- [ ] architecture decision gate outcome is recorded and honored
+- [ ] `production-readiness.md` blocking conditions are cleared
 
-- all required scripts exist
-- docs and implementation agree on API and event names
-- all built-in adapters have doctor coverage
-- all built-in adapters have live-test coverage
-- browser UI is usable on desktop and acceptable on tablet or mobile
-- default local auth and bind behavior are safe
+### Automated verification
+- [ ] `npm run lint`
+- [ ] `npm run typecheck`
+- [ ] `npm run test`
+- [ ] `npm run test:e2e`
+- [ ] `npm run test:live -- --agent codex`
+- [ ] `npm run test:live -- --agent claude`
+- [ ] `npm run test:live -- --agent opencode`
+
+### Product readiness
+- [ ] dashboard/session/settings/doctor flows meet the product spec
+- [ ] replay/recovery behavior matches the architecture and storage specs
+- [ ] capability-gated affordances are honest and functional where declared
+
+### Operational readiness
+- [ ] doctor output surfaces missing prerequisites clearly
+- [ ] structured logs and required counters/metrics exist and redact secrets
+- [ ] pruning/retention behavior is implemented and observable
+
+### Human validation
+- [ ] manual checklist from `testing-and-live-validation.md` is complete
+- [ ] prepared-environment live evidence exists for each built-in adapter

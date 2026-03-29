@@ -1,81 +1,99 @@
 # Project Specification
 
-This `docs/` directory is the implementation contract for a local-first web control plane for CLI coding agents. It is written to be portable into a fresh workspace and to stand on its own without any other repository context.
+This `docs/` directory is the production contract for **Remote Control All-in-One**: a local-first browser control plane for CLI coding agents.
+
+The contract has two jobs:
+1. define the product that must exist at release time
+2. define the implementation and verification gates required to call the project production-ready
 
 ## Scope
 
-The product is a single-user local application that:
-
-- runs supported coding agents on the local machine
-- exposes a browser-based control plane instead of a chat-platform UI
-- supports multiple agent backends through a normalized adapter system
-- provides enough structure for later agents to plan, implement, test, and live-test the project end to end
+V1 is a **single-user**, **local-first** application that:
+- launches and manages supported coding-agent sessions on the local machine
+- exposes a browser-based control plane instead of relying on chat-platform UIs
+- supports multiple agent backends through a normalized adapter boundary
+- preserves durable session state through normalized events and snapshots
+- can be verified with automated non-live tests, browser E2E tests, and prepared-environment live tests
 
 ## Reading Order
 
 1. [product-spec.md](./product-spec.md)
-   Defines the user-facing product, supported flows, required screens, CLI behavior, and acceptance criteria.
+   - user-facing product behavior, required flows, required UI surfaces, and UX/security requirements
 2. [architecture.md](./architecture.md)
-   Defines the runtime model, subsystem boundaries, eventing, state model, security boundaries, and recommended source layout.
+   - runtime model, state truth, recovery rules, module boundaries, and architecture decision gate
 3. [agent-adapters.md](./agent-adapters.md)
-   Defines the normalized adapter contract and the specific requirements for Codex, Claude Code, and OpenCode.
+   - normalized adapter contract and the release requirements for Codex, Claude Code, and OpenCode
 4. [api.md](./api.md)
-   Defines the HTTP and WebSocket contract, event envelope, error model, and required schemas.
+   - HTTP and WebSocket contract, replay semantics, auth rules, and idempotency requirements
 5. [config-storage.md](./config-storage.md)
-   Defines configuration, secrets handling, persistent storage, retention, recovery, and log formats.
+   - config shape, persistent storage, temp namespaces, retention/pruning, and recovery precedence
 6. [testing-and-live-validation.md](./testing-and-live-validation.md)
-   Defines the required test pyramid, fixtures, CI expectations, and live-test contract.
-7. [work-packages.md](./work-packages.md)
-   Breaks implementation into parallelizable packages with exit criteria.
+   - required test pyramid, prepared-environment live validation, release evidence, and exit codes
+7. [production-readiness.md](./production-readiness.md)
+   - release gate, prepared-environment assumptions, evidence bundle, and blocking conditions
+8. [work-packages.md](./work-packages.md)
+   - execution-ready implementation phases and the final release checklist
 
 ## Locked Product Decisions
 
-- The application is local-first and single-user in v1.
-- The primary interface is a web UI served from the local daemon.
+- V1 is local-first and single-user.
 - The daemon binds to `127.0.0.1` by default.
-- Non-loopback hosting is opt-in and requires explicit password protection.
-- The backend exposes a stable JSON API and a WebSocket event stream.
-- Agent-specific integrations live behind a shared adapter contract.
-- Session behavior is driven by normalized events and pending actions, not by terminal scraping in the UI.
-- `tmux` remains the default attach mechanism for interactive local sessions when an adapter supports attach.
-- Built-in adapters for v1 are Codex, Claude Code, and OpenCode.
-- Persistent state is append-only for session events plus a resumable session snapshot.
+- Non-loopback hosting is opt-in and requires password auth.
+- The browser UI and CLI operate on the same core runtime and persisted state.
+- Normalized events and materialized snapshots are the source of truth; raw terminal output is supplemental.
+- Attach and open-directory affordances are capability-gated optional features, not universal guarantees.
+- Every built-in adapter must ship with a **minimum releasable transport** even if optional attach/tmux behavior differs by vendor.
+- The current repository baseline keeps the Fastify + server-served modular SPA approach unless the architecture decision gate explicitly requires refactoring.
+- Release readiness is defined by passing evidence, not by partial feature presence.
 
 ## Deliverables Required By This Spec
 
+A v1 release must include:
 - a runnable local daemon
-- a browser UI with dashboard, session workspace, and settings/doctor views
-- CLI commands for setup, daemon control, agent inspection, and session lifecycle
-- a normalized core runtime with session manager, event bus, event store, and adapter layer
-- working adapters for Codex, Claude Code, and OpenCode
-- unit, integration, browser E2E, and live tests
-- documentation generated from or aligned with these contracts
+- a browser UI with dashboard, session workspace, settings, and doctor surfaces
+- CLI commands for bootstrap, daemon control, agent inspection, and session control
+- a normalized runtime with session manager, reducer/materializer, event storage, recovery, and observability hooks
+- working built-in adapters for Codex, Claude Code, and OpenCode
+- prepared-environment live-test paths for all built-in adapters
+- documentation aligned with the shipped implementation and release gate
+
+## Implementation Sequencing Rule
+
+The implementation must proceed in this order:
+1. repair and align `docs/`
+2. lock behavior with tests and fixtures
+3. harden core runtime, storage, replay, and auth
+4. complete API, WebSocket, CLI, and UI
+5. deliver real adapters one by one
+6. complete release validation and manual evidence collection
+
+No phase may claim completion until its verification gates pass.
 
 ## Definition Of Done
 
 The project is done for v1 only when all of the following are true:
+- the revised docs are internally consistent and sufficient to guide implementation without hidden assumptions
+- the web UI can create, stream, control, recover, and terminate sessions for all built-in adapters
+- required API and WebSocket behavior from [api.md](./api.md) is implemented and verified
+- storage, retention, pruning, and recovery rules from [config-storage.md](./config-storage.md) are implemented and verified
+- adapter requirements from [agent-adapters.md](./agent-adapters.md) are satisfied for Codex, Claude Code, and OpenCode
+- all required tests from [testing-and-live-validation.md](./testing-and-live-validation.md) pass
+- each built-in adapter has at least one successful prepared-environment live validation path
+- release evidence includes automated results, recovery/performance evidence, and manual validation checklist completion
 
-- the web UI can create, stream, control, and terminate sessions for all supported adapters
-- all public API endpoints in [api.md](./api.md) are implemented and tested
-- all persistent state and recovery behavior in [config-storage.md](./config-storage.md) are implemented
-- all adapter requirements in [agent-adapters.md](./agent-adapters.md) are met
-- all required tests in [testing-and-live-validation.md](./testing-and-live-validation.md) pass
-- each supported agent has a live validation path that exits `0` on success, `1` on failure, and `2` when blocked by missing prerequisites
+## Release Semantics
+
+- A local developer machine may legitimately report a live test as **blocked** (`exit 2`) when a binary, auth state, or other documented prerequisite is missing.
+- A **release candidate** may only be called production-ready after live validation succeeds in a **prepared environment** where all built-in adapter prerequisites are satisfied.
+- Blocked local validation is informative; it is not a substitute for prepared-environment release evidence.
 
 ## External References
 
 These references inform feasibility and integration strategy. They do not override this spec.
 
-- Official Codex docs and repository:
-  - [https://developers.openai.com/codex/](https://developers.openai.com/codex/)
-  - [https://github.com/openai/codex](https://github.com/openai/codex)
-- Official Claude Code docs and repository:
-  - [https://docs.claude.com/en/docs/claude-code](https://docs.claude.com/en/docs/claude-code)
-  - [https://github.com/anthropics/claude-code](https://github.com/anthropics/claude-code)
-- Official OpenCode docs and repository:
-  - [https://opencode.ai/docs](https://opencode.ai/docs)
-  - [https://github.com/anomalyco/opencode](https://github.com/anomalyco/opencode)
-- Community add-on references:
-  - [https://github.com/Yeachan-Heo/oh-my-codex](https://github.com/Yeachan-Heo/oh-my-codex)
-  - [https://github.com/yeachan-heo/oh-my-claudecode](https://github.com/yeachan-heo/oh-my-claudecode)
-  - [https://github.com/code-yeongyu/oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent)
+- Codex docs:
+  - https://developers.openai.com/codex/
+- Claude Code docs:
+  - https://docs.claude.com/en/docs/claude-code
+- OpenCode docs:
+  - https://opencode.ai/docs/

@@ -2,24 +2,25 @@
 
 ## 1. Purpose
 
-The test strategy must prove:
-
+The verification strategy must prove all of the following:
 - the normalized core behaves correctly without vendor binaries
-- each adapter integration is correct against its official surface
-- the browser UI works end to end
-- the product can be live-tested against real installed agents
+- the browser UI works end to end against real runtime behavior
+- each built-in adapter works through public product surfaces
+- recovery, replay, and retention behavior are reliable
+- the release gate is backed by prepared-environment evidence, not local guesswork
 
 ## 2. Required Test Layers
 
+The project must ship with these layers:
 - unit tests
 - integration tests
 - browser E2E tests
 - live tests
+- manual release validation checklist
 
 ## 3. Required Package Scripts
 
-At minimum, the implementation must expose:
-
+At minimum, the implementation must expose and keep working:
 - `npm run lint`
 - `npm run typecheck`
 - `npm run test`
@@ -29,213 +30,211 @@ At minimum, the implementation must expose:
 - `npm run test:live`
 - `npm run check`
 
-`npm run check` must aggregate the fast non-live validations that are appropriate for CI and local development.
+`npm run check` must aggregate the fast non-live checks appropriate for CI and local development.
 
-## 4. Unit Tests
+## 4. Baseline Reality Check
 
-Unit tests must cover:
+At the time these docs were repaired, the repository baseline was:
+- `npm run check` passed
+- `npm run test:e2e` failed because no Playwright tests existed yet
+- live tests exited `2` for Codex and Claude because runtime integration was still placeholder-only
+- live tests exited `2` for OpenCode because the local machine lacked the binary
 
-- config parsing and validation
-- execution policy normalization
-- session reducer or materializer logic
-- event sequence assignment
-- pending action reducers
-- API request validation
-- adapter option schema validation
-- CLI argument parsing
+This baseline is acceptable only as a starting point. It is not acceptable for release.
+
+## 5. Unit Tests
+
+Unit coverage must include:
+- config parsing, defaults, env overrides, and mutable-setting classification
+- auth/session/CSRF helpers
+- redaction behavior
+- schema validation for config, API payloads, snapshots, event lines, and adapter options
+- reducer/materializer transitions
+- event sequencing and replay helpers
+- idempotency helpers
+- retention/pruning calculations
 - doctor summary formatting
+- adapter parser/mapping helpers
 
 Required edge cases:
-
-- duplicate client message ids
-- stale pending action resolution
+- duplicate create-session idempotency keys
+- duplicate message client ids
+- stale pending-action resolution
 - invalid mode transitions
-- snapshot rebuild from events
-- secret redaction
+- crash-truncated event log replay
+- snapshot rebuild after missing or stale active-session index
+- secret redaction in nested payloads
 
-## 5. Integration Tests
+## 6. Integration Tests
 
-Integration tests must run against fake adapters and real storage.
+Integration tests must run against real storage and a deterministic fake adapter harness.
 
-A fake adapter framework is required. It must be able to simulate:
-
+The fake adapter framework must simulate:
 - delayed streaming
 - approval requests
 - question requests
 - plan requests
-- restart-required mode change
+- restart-required mode changes
+- restart-required policy changes
 - graceful termination
+- forced termination after timeout
 - crash on startup
 - crash during run
 
 Required integration scenarios:
-
-- create session and receive first events
-- send message and stream commentary plus final output
+- create session and receive first normalized events
+- send message and receive commentary/final output
 - resolve approval allow
 - resolve approval deny
 - resolve question with freeform answer
 - resolve plan with `accept`
 - resolve plan with `stay_in_plan`
-- switch mode with no restart
-- switch mode with restart
-- update execution policy
+- switch mode without restart
+- switch mode with restart-required transition
+- update execution policy with truthful restart reporting
 - terminate gracefully
 - force terminate after timeout
-- browser refresh style replay from `afterSequence`
-- daemon restart style recovery from snapshot plus event log
+- browser-refresh replay from `afterSequence`
+- daemon-restart recovery from snapshot + event log + adapter reconciliation
+- attach capability fallback behavior
+- doctor/bootstrap/status flows
 
-## 6. Browser E2E Tests
+## 7. Browser E2E Tests
 
-Browser E2E tests must use Playwright.
+Browser E2E tests must use Playwright and exercise the real daemon through browser-visible flows.
 
 Required scenarios:
-
-- first-run onboarding or bootstrap handoff page
-- dashboard render with doctor information
+- bootstrap or login handoff
+- dashboard render with doctor information and adapter readiness
 - create session from dashboard
 - workspace transcript streaming
 - pending approval resolution in UI
-- pending question answer in UI
-- mode toggle in UI
-- terminate from UI
+- pending question resolution in UI
+- plan decision flow in UI
+- mode toggle and policy update in UI
+- terminate and force-terminate in UI
 - settings edit and persistence
 - reconnect after backend restart
 
-Required browser assertions:
-
+Required assertions:
 - optimistic user message appears and reconciles
 - no duplicate transcript entries after reconnect
-- pending action cards disappear after resolution
-- disabled actions match capability flags
+- pending-action cards disappear or change state after resolution
+- disabled or hidden controls match capability flags
+- visible focus states and keyboard navigation work for critical controls
+- required live regions announce pending state and session-status changes
 
-## 7. Live Tests
+## 8. Live Tests
 
-Live tests run against real installed agents and must use the public API, not private internals.
+Live tests must use the public API and public auth flow only.
 
 Required entry points:
-
 - `npm run test:live -- --agent codex`
 - `npm run test:live -- --agent claude`
 - `npm run test:live -- --agent opencode`
 
-## 7.1 Live Test Exit Codes
+### 8.1 Exit Codes
 
 - `0` success
 - `1` functional failure
-- `2` blocked by missing binary, missing auth, or missing local prerequisite
+- `2` blocked by missing binary, missing auth, missing tmux when required, or another documented prerequisite
 
-Blocked must not be reported as success.
+Blocked is informative. It is never counted as success.
 
-## 7.2 Live Test Prerequisite Checks
+### 8.2 Prepared-Environment Requirement
 
-Each live test must verify before starting:
+A release candidate is not production-ready until each built-in adapter has at least one successful live validation in a **prepared environment** where:
+- the adapter binary is installed
+- the adapter is authenticated if required
+- tmux is available when the transport requires it
+- the working directory and permissions are configured as the adapter expects
 
-- agent binary present on `PATH`
-- adapter probe status not blocked
-- `tmux` present if the selected adapter transport requires it
-- required local auth exists when detectable
+Local developer runs may still return `2`. Release validation may not.
 
-## 7.3 Standard Live Test Workspace
+### 8.3 Standard Live Test Workspace
 
-Each live test run must create its own temporary workspace with:
-
-- a known path under the system temp directory
-- a tiny seed repository or folder
-- a small text file to inspect
-
-Recommended seed files:
-
+Each live run must create an isolated temporary workspace containing at minimum:
 - `README.md`
 - `sample.txt`
+- any tiny fixture files needed to verify plan vs build behavior
 
-## 7.4 Standard Live Test Scenarios
+### 8.4 Standard Live Scenarios
 
-Every agent live test must execute these scenarios through the public API:
+Every adapter live test must execute these scenarios through public product surfaces:
 
-### Scenario A: Health And Session Creation
+#### Scenario A — Health And Session Creation
+1. start daemon on a random localhost port
+2. wait for `GET /api/health`
+3. create a session in `plan` mode with a non-mutating inspection prompt
+4. verify a session id is returned and at least one assistant event arrives
 
-1. Start daemon on a random localhost port.
-2. Wait for `GET /api/health` success.
-3. Create a session in `plan` mode with a harmless inspection prompt.
-4. Verify a session id is returned and at least one assistant event arrives.
+#### Scenario B — Plan Mode Verification
+1. send a prompt that requires analysis but forbids file mutation
+2. verify a final response arrives
+3. verify seed files remain unchanged
 
-### Scenario B: Mode Verification
+#### Scenario C — Build Mode Verification
+1. switch to `build` mode
+2. update policy so the requested write path is allowed
+3. send a prompt that creates or edits a known file with exact contents
+4. resolve approvals through the public pending-action route if surfaced
+5. verify file contents exactly
 
-1. In `plan` mode, send:
-   - "Inspect the workspace and propose two steps to update sample.txt. Do not modify files."
-2. Verify:
-   - a final response arrives
-   - `sample.txt` remains unchanged
+#### Scenario D — Session Termination
+1. terminate the session
+2. verify termination event appears
+3. verify the session summary transitions to `terminated`
 
-### Scenario C: Build Verification
+#### Scenario E — Persistence Verification
+1. read session events through the public API
+2. verify required lifecycle events are present
+3. verify persisted event log and snapshot files exist and are non-empty
 
-1. Switch to `build` mode.
-2. Update policy so writes are allowed and approvals are `on-request`.
-3. Send:
-   - "Create a file named LIVE_TEST_OUTPUT.txt with exact contents live test ok"
-4. If an approval appears, resolve it through `/pending/:id/resolve`.
-5. Verify:
-   - final response arrives
-   - `LIVE_TEST_OUTPUT.txt` exists
-   - file contents match exactly
+## 9. Observability And Performance Validation
 
-### Scenario D: Session Termination
+The verification suite or release checklist must collect evidence for:
+- warm startup to usable dashboard under target bounds
+- first visible session state under target bounds
+- reconnect to visible transcript under target bounds
+- replay correctness with at least 10,000 events per session
+- retained-history correctness with at least 100 active/recent sessions
+- redacted structured logs and required counters/metrics
 
-1. Terminate the session through the public API.
-2. Verify a `session.terminated` event appears.
-3. Verify the session status becomes `terminated`.
+## 10. Required Fixtures And Helpers
 
-### Scenario E: Persistence Verification
+Required shared helpers:
+- fake adapter harness
+- storage-root sandbox helper
+- daemon launcher helper
+- websocket client helper with resume-cursor support
+- temporary workspace factory
+- per-adapter live workspace seed helper
 
-1. Read `/api/sessions/:id/events`.
-2. Verify the log contains:
-   - `session.started`
-   - at least one `assistant.final`
-   - `session.terminated`
-3. Verify the on-disk event log exists and is non-empty.
-
-## 7.5 Optional Live Scenario
-
-If the adapter can surface questions in a deterministic way, add:
-
-- one question request and resolution flow
-
-This is optional because not every vendor may expose a predictable question prompt in a stable automated manner.
-
-## 8. CI Expectations
+## 11. CI Expectations
 
 Required CI jobs:
-
-- lint and typecheck
-- unit and integration tests
+- lint + typecheck
+- unit + integration tests
 - browser E2E tests on at least one supported OS
 
-Live tests may run in a dedicated environment and are not required for every pull request, but they must be runnable on demand and in release validation.
+Live tests may run in a dedicated environment instead of every pull request, but they must be runnable on demand and required for release validation.
 
-## 9. Required Test Fixtures
+## 12. Release Gate
 
-- fake adapter implementation
-- fake event source helper
-- temporary workspace factory
-- storage-root sandbox helper
-- daemon launcher helper for tests
-- WebSocket client helper with resume cursor support
-
-## 10. Release Gate
-
-The product is not releasable unless:
-
+The project is not releasable until:
 - all non-live tests pass
-- at least one live test path has been exercised successfully for each built-in adapter in a suitable environment
-- unresolved flaky tests are tracked and below the team's defined threshold
+- browser E2E tests pass
+- prepared-environment live validation succeeds for each built-in adapter
+- blocked live tests are never reported as success
+- manual validation checklist is complete
+- unresolved flaky tests are documented and below the release threshold
 
-## 11. Manual Validation Checklist
+## 13. Manual Validation Checklist
 
-Before release, a human should confirm:
-
+Before release, a human must confirm:
 - dashboard session creation feels responsive
-- doctor guidance is understandable for missing prerequisites
-- pending approvals and questions are obvious in the UI
-- reconnect after browser refresh feels seamless
-- force terminate behaves safely and clearly
+- doctor guidance is understandable when prerequisites are missing
+- pending approvals/questions/plans are obvious and actionable
+- reconnect after refresh feels seamless
+- force terminate is safe and clear
+- capability-gated affordances (attach/open-directory) are either functional or honestly disabled

@@ -3,12 +3,10 @@
 ## 1. API Shape
 
 The daemon exposes:
-
-- JSON over HTTP for control and snapshots
-- WebSocket for live events
+- JSON over HTTP for control, snapshots, settings, and doctor data
+- WebSocket for live event replay and subscription
 
 Base URL examples:
-
 - `http://127.0.0.1:4319`
 - `http://localhost:4319`
 
@@ -16,29 +14,26 @@ All routes are rooted at `/api`.
 
 ## 2. Versioning
 
-The initial version is unprefixed, but all responses must include:
-
+The initial API is unprefixed, but every response must include:
 - `apiVersion`
 - `serverTime`
 
-If a future breaking version is added, it must use path versioning such as `/api/v2`.
+Breaking changes require path versioning such as `/api/v2`.
 
 ## 3. Authentication
 
 Required auth modes:
-
 - `local-session`
-  - daemon-managed local auth cookie or bearer token
 - `password`
-  - explicit password-based login for non-loopback hosting
 
-Unauthenticated requests must return `401`.
-
-The browser SPA must be able to determine auth state through dedicated auth routes.
+Rules:
+- unauthenticated requests return `401`
+- state-changing browser requests require CSRF validation
+- the SPA must be able to discover auth state through dedicated auth routes
 
 ## 4. Common Response Envelope
 
-Success responses:
+Success:
 
 ```json
 {
@@ -49,7 +44,7 @@ Success responses:
 }
 ```
 
-Error responses:
+Error:
 
 ```json
 {
@@ -66,7 +61,7 @@ Error responses:
 
 ## 5. Common Schemas
 
-## 5.1 `SessionSummary`
+### 5.1 SessionSummary
 
 ```json
 {
@@ -83,169 +78,84 @@ Error responses:
 }
 ```
 
-## 5.2 `SessionDetail`
+### 5.2 SessionDetail
 
-```json
-{
-  "id": "ses_01H...",
-  "title": "Refactor auth middleware",
-  "agentId": "codex",
-  "status": "running",
-  "mode": "build",
-  "cwd": "/workspace/app",
-  "executionPolicy": {
-    "filesystem": "workspace-write",
-    "network": "on",
-    "approvals": "on-request",
-    "writableRoots": ["/workspace/app"]
-  },
-  "capabilities": {
-    "agentId": "codex",
-    "displayName": "Codex",
-    "transport": "pty",
-    "supportsPlanMode": true,
-    "supportsModeSwitch": true,
-    "supportsExecutionPolicySwitch": true,
-    "supportsPendingApprovals": true,
-    "supportsQuestions": true,
-    "supportsTmuxAttach": true,
-    "supportsStructuredEvents": true,
-    "supportsResume": true,
-    "supportsForceTerminate": true,
-    "supportsLocalBrowserOpen": false,
-    "planModeImplementation": "native",
-    "executionPolicyImplementation": "native"
-  },
-  "pendingActions": [],
-  "lastSequence": 42,
-  "createdAt": "2026-03-29T10:00:00.000Z",
-  "updatedAt": "2026-03-29T10:01:00.000Z"
-}
-```
+`SessionDetail` extends `SessionSummary` with:
+- `executionPolicy`
+- `capabilities`
+- `pendingActions`
+- `adapterState` (server-owned, browser-safe subset only when needed)
 
-## 5.3 `SessionEvent`
+### 5.3 SessionEvent
 
-```json
-{
-  "id": "evt_01H...",
-  "sessionId": "ses_01H...",
-  "sequence": 42,
-  "type": "assistant.final",
-  "createdAt": "2026-03-29T10:01:00.000Z",
-  "source": {
-    "adapterId": "codex",
-    "vendorEventType": "turn.completed"
-  },
-  "data": {
-    "channel": "final",
-    "text": "Implemented the change and updated tests."
-  }
-}
-```
+Required fields:
+- `id`
+- `sessionId`
+- `sequence`
+- `type`
+- `createdAt`
+- `source.adapterId`
+- `data`
 
-## 5.4 `PendingAction`
+### 5.4 PendingAction
 
-```json
-{
-  "id": "pa_01H...",
-  "sessionId": "ses_01H...",
-  "type": "approval",
-  "status": "open",
-  "prompt": "Allow writing files in /workspace/app?",
-  "options": [
-    { "id": "allow", "label": "Allow", "kind": "allow" },
-    { "id": "deny", "label": "Deny", "kind": "deny" }
-  ],
-  "createdAt": "2026-03-29T10:00:30.000Z",
-  "vendorPayload": {
-    "tool": "write_file"
-  }
-}
-```
+Required fields:
+- `id`
+- `sessionId`
+- `type`
+- `status`
+- `prompt`
+- `options`
+- `defaultOptionId` when applicable
+- `createdAt`
+- optional `vendorPayload`
 
-## 6. HTTP Endpoints
+## 6. Idempotency Rules
 
-## 6.0 Auth Endpoints
+### 6.1 Session Creation
 
-### `GET /api/auth/session`
+`POST /api/sessions` must support `X-Idempotency-Key`.
 
-Returns current auth state for the browser client.
+If the same authenticated client repeats a create request with the same effective payload and idempotency key, the server must return the existing normalized session instead of creating a duplicate.
 
-Response data:
+### 6.2 Session Messages
 
-```json
-{
-  "authenticated": true,
-  "mode": "local-session"
-}
-```
+`POST /api/sessions/:id/messages` requires `clientMessageId`.
 
-### `POST /api/auth/login`
+Duplicate client message ids for the same session must not create duplicate `user.sent` events.
 
-Required for `password` mode and optional for future token exchange flows.
+## 7. HTTP Endpoints
 
-Request body:
+### 7.0 Auth Endpoints
 
-```json
-{
-  "password": "example"
-}
-```
+#### `GET /api/auth/session`
+Returns current browser auth state.
 
-Success behavior:
+#### `POST /api/auth/login`
+Logs in for password mode.
 
-- server issues an authenticated cookie or session token
-- response returns current auth state
+#### `POST /api/auth/logout`
+Clears the current authenticated browser session.
 
-### `POST /api/auth/logout`
+### 7.1 `GET /api/health`
+Returns daemon readiness and basic runtime status.
 
-Clears the current authenticated session.
+### 7.2 `GET /api/agents`
+Returns:
+- adapter probe results
+- capability metadata
+- adapter option schema
+- doctor summary when useful for the dashboard
 
-## 6.1 `GET /api/health`
-
-Returns daemon readiness and basic environment health.
-
-Response data:
-
-```json
-{
-  "status": "ok",
-  "daemon": {
-    "pid": 12345,
-    "bind": "127.0.0.1:4319",
-    "uptimeSeconds": 121
-  }
-}
-```
-
-## 6.2 `GET /api/agents`
-
-Returns installed adapters, capabilities, schemas, and doctor status.
-
-Response data:
-
-```json
-{
-  "agents": [
-    {
-      "probe": {},
-      "capabilities": {},
-      "optionSchema": {}
-    }
-  ]
-}
-```
-
-## 6.3 `GET /api/sessions`
-
+### 7.3 `GET /api/sessions`
 Returns active and recent sessions.
 
 Query params:
-
 - `status`
 - `agentId`
 - `limit`
 - `cursor`
+- `search`
 
 Response data:
 
@@ -256,47 +166,32 @@ Response data:
 }
 ```
 
-## 6.4 `POST /api/sessions`
-
+### 7.4 `POST /api/sessions`
 Creates a session.
 
-Request body:
+Required request fields:
+- `agentId`
+- `cwd`
+- `initialPrompt`
+- `mode`
+- `executionPolicy`
 
-```json
-{
-  "agentId": "codex",
-  "cwd": "/workspace/app",
-  "title": "",
-  "initialPrompt": "Inspect the repository and propose a refactor plan.",
-  "mode": "plan",
-  "executionPolicy": {
-    "filesystem": "read-only",
-    "network": "off",
-    "approvals": "on-request",
-    "writableRoots": []
-  },
-  "extraDirectories": [],
-  "adapterOptions": {}
-}
-```
+Optional request fields:
+- `title`
+- `extraDirectories`
+- `adapterOptions`
 
-Rules:
+Response:
+- full `SessionDetail`
 
-- if `title` is empty, the backend must derive a title
-- the endpoint should support `X-Idempotency-Key`
-- the response must return a full `SessionDetail`
+### 7.5 `GET /api/sessions/:id`
+Returns latest materialized session detail.
 
-## 6.5 `GET /api/sessions/:id`
-
-Returns the latest materialized session detail.
-
-## 6.6 `GET /api/sessions/:id/events`
-
-Returns event history for one session.
+### 7.6 `GET /api/sessions/:id/events`
+Returns ordered event history for one session.
 
 Query params:
-
-- `afterSequence`
+- `afterSequence` (exclusive)
 - `limit`
 
 Response data:
@@ -308,13 +203,7 @@ Response data:
 }
 ```
 
-Rules:
-
-- items must be ordered by ascending sequence
-- `afterSequence` is exclusive
-
-## 6.7 `POST /api/sessions/:id/messages`
-
+### 7.7 `POST /api/sessions/:id/messages`
 Sends user input into a session.
 
 Request body:
@@ -326,63 +215,26 @@ Request body:
 }
 ```
 
-Rules:
-
-- `clientMessageId` is required for idempotency
-- optimistic UI updates must reconcile with the resulting `user.sent` event
-
-## 6.8 `POST /api/sessions/:id/mode`
-
+### 7.8 `POST /api/sessions/:id/mode`
 Updates session mode.
 
-Request body:
+Response data must include:
+- `mode`
+- `restartRequired`
+- optional `reason`
 
-```json
-{
-  "mode": "build"
-}
-```
-
-Response data:
-
-```json
-{
-  "mode": "build",
-  "restartRequired": false
-}
-```
-
-## 6.9 `POST /api/sessions/:id/policy`
-
+### 7.9 `POST /api/sessions/:id/policy`
 Updates execution policy.
 
-Request body:
+Response data must include:
+- `executionPolicy`
+- `restartRequired`
+- optional `reason`
 
-```json
-{
-  "executionPolicy": {
-    "filesystem": "workspace-write",
-    "network": "on",
-    "approvals": "on-request",
-    "writableRoots": ["/workspace/app", "/workspace/shared"]
-  }
-}
-```
-
-Response data:
-
-```json
-{
-  "executionPolicy": {},
-  "restartRequired": true
-}
-```
-
-## 6.10 `POST /api/sessions/:id/pending/:pendingId/resolve`
-
+### 7.10 `POST /api/sessions/:id/pending/:pendingId/resolve`
 Resolves an open pending action.
 
-Request body for approval or plan:
+For approvals/plans:
 
 ```json
 {
@@ -392,7 +244,7 @@ Request body for approval or plan:
 }
 ```
 
-Request body for question:
+For questions:
 
 ```json
 {
@@ -403,9 +255,8 @@ Request body for question:
 }
 ```
 
-## 6.11 `POST /api/sessions/:id/terminate`
-
-Terminates a session.
+### 7.11 `POST /api/sessions/:id/terminate`
+Requests graceful or forced termination.
 
 Request body:
 
@@ -415,65 +266,26 @@ Request body:
 }
 ```
 
-Response data:
+### 7.12 `GET /api/settings`
+Returns browser-safe daemon settings.
 
-```json
-{
-  "accepted": true
-}
-```
+### 7.13 `PUT /api/settings`
+Updates mutable settings and returns:
+- updated browser-safe settings
+- `restartRequired`
+- `reasons` (list of changed fields that require restart)
 
-## 6.12 `GET /api/settings`
+### 7.14 `GET /api/doctor`
+Returns full doctor report.
 
-Returns daemon configuration safe for browser display.
-
-Secrets must be redacted or omitted.
-
-## 6.13 `PUT /api/settings`
-
-Updates mutable settings.
-
-Mutable examples:
-
-- bind host
-- port
-- auth mode
-- retention
-- UI preferences
-
-Immutable or protected settings must reject writes with `400` or `403`.
-
-## 6.14 `GET /api/doctor`
-
-Returns full runtime doctor report.
-
-Response data:
-
-```json
-{
-  "status": "warning",
-  "checks": [
-    {
-      "id": "tmux",
-      "status": "healthy",
-      "summary": "tmux is installed."
-    }
-  ],
-  "agents": []
-}
-```
-
-## 7. WebSocket Contract
+## 8. WebSocket Contract
 
 Endpoint:
-
 - `WS /api/events`
 
-The WebSocket is global, not per session. Clients may filter locally or subscribe to a subset after connect.
+The websocket is global and replay-aware.
 
-## 7.1 Client Hello
-
-Client may send:
+### 8.1 Client Subscribe Message
 
 ```json
 {
@@ -485,9 +297,9 @@ Client may send:
 }
 ```
 
-If omitted, the server may stream all authorized session events.
+If `sessionIds` is omitted, the server may stream all authorized sessions.
 
-## 7.2 Server Messages
+### 8.2 Server Messages
 
 Event message:
 
@@ -526,75 +338,34 @@ Error message:
 }
 ```
 
-## 8. Event Type Payloads
+### 8.3 Replay Rules
 
-`assistant.delta`
+- replay is driven by persisted per-session sequences
+- replay uses the same reducer/materializer truth as HTTP session detail
+- servers must not emit duplicate events for the same event id during reconnect
+- clients may receive a snapshot before replay events for that session
 
-```json
-{
-  "channel": "commentary",
-  "textDelta": "Inspecting the auth flow now."
-}
-```
+## 9. Required Event Types
 
-`assistant.final`
+Required public event types:
+- `session.started`
+- `session.updated`
+- `assistant.delta`
+- `assistant.final`
+- `user.sent`
+- `approval.requested`
+- `approval.resolved`
+- `question.requested`
+- `question.resolved`
+- `plan.requested`
+- `plan.resolved`
+- `terminal.output`
+- `session.terminated`
+- `session.error`
 
-```json
-{
-  "channel": "final",
-  "text": "Updated the middleware and added tests."
-}
-```
+## 10. Error Codes
 
-`approval.requested`
-
-```json
-{
-  "pendingAction": {}
-}
-```
-
-`question.requested`
-
-```json
-{
-  "pendingAction": {}
-}
-```
-
-`plan.requested`
-
-```json
-{
-  "pendingAction": {},
-  "planPreview": "1. Update parser. 2. Add tests. 3. Validate CLI behavior."
-}
-```
-
-`terminal.output`
-
-```json
-{
-  "stream": "stdout",
-  "chunk": "Running npm test\n"
-}
-```
-
-`session.error`
-
-```json
-{
-  "code": "adapter_launch_failed",
-  "message": "Agent process exited before session initialization.",
-  "recoverable": true,
-  "actionHint": "Review doctor output and retry."
-}
-```
-
-## 9. Error Codes
-
-Required API error codes:
-
+Required error codes:
 - `unauthorized`
 - `forbidden`
 - `invalid_request`
@@ -606,9 +377,9 @@ Required API error codes:
 - `conflict`
 - `internal_error`
 
-## 10. Compatibility Rules
+## 11. Compatibility Rules
 
-- new optional response fields may be added without version bump
-- existing fields may not change meaning without version bump
-- event types are append-only in v1
-- event payloads may gain optional fields, but required fields may not disappear
+- new optional fields may be added without a version bump
+- required fields may not disappear or change meaning without a version bump
+- new event types are append-only in v1
+- capability-gated affordances may be omitted or disabled when the adapter truthfully reports lack of support

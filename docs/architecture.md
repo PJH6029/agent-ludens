@@ -2,94 +2,108 @@
 
 ## 1. Architectural Principles
 
-- Local-first: all core functionality must work on one developer machine without external orchestration.
-- Adapter isolation: agent-specific behavior must be contained behind a narrow contract.
-- Event-sourced session state: durable session truth comes from append-only events plus resumable snapshots.
-- UI from normalized state: browser logic must depend on normalized events and pending actions, not fragile terminal parsing.
-- Recoverability first: refresh, daemon restart, and adapter restart are expected, not exceptional.
-- Thin transport edges: CLI and web UI are clients of the same core runtime.
+- **Local-first:** v1 must work on one developer machine without remote orchestration.
+- **Normalized truth:** persisted normalized events plus materialized snapshots define session truth.
+- **Single replay model:** one reducer/materializer model must drive replay, recovery, API summaries, and UI expectations.
+- **Adapter isolation:** vendor-specific launch/config/transport logic stays inside adapters.
+- **Recoverability first:** browser refresh, daemon restart, and adapter restart are expected scenarios.
+- **Truthful capability reporting:** the system must never promise stronger transport, attach, or security guarantees than a given adapter actually provides.
 
-## 2. Recommended Technology Baseline
+## 2. Architecture Decision Gate
 
-This spec is framework-flexible, but the recommended baseline is:
+Before broad implementation, the project must answer a single architecture gate:
 
+- **Default decision:** keep the current Fastify + server-served modular SPA architecture.
+- **Escalation rule:** refactor only if the docs audit proves the current structure blocks a release-critical requirement such as replay truth, adapter integration, accessibility, or testability.
+- **If refactoring is required:** the change must be narrow, documented, and justified by a specific blocked requirement.
+
+For v1, the default assumption is **keep the current structure** and improve modularity within it.
+
+## 3. Recommended Technology Baseline
+
+The production baseline for this repository is:
 - Node `>=20`
-- TypeScript with ESM
-- Fastify or equivalent HTTP server with WebSocket support
-- React with Vite for the browser UI
+- TypeScript with ESM for backend/runtime logic
+- Fastify for HTTP + WebSocket server behavior
+- a server-served browser UI built from modular JavaScript/CSS/HTML assets
 - Vitest for unit and integration testing
 - Playwright for browser E2E and live validation
 
-Equivalent alternatives are allowed only if they preserve the runtime contracts and testability defined by this spec.
+Equivalent replacements are allowed only when the architecture decision gate records why the change is necessary.
 
-## 3. Runtime Components
+## 4. Runtime Components
 
-The system consists of four core subsystems plus shared infrastructure:
-
+The system consists of:
 - `SessionManager`
+- `SessionReducer` / materializer
 - `EventBus`
 - `EventStore`
 - `AgentAdapters`
-- `WebServerAndUI`
-- shared config, logging, doctor, and CLI layers
+- `AuthManager`
+- `Doctor`
+- `WebServer`
+- `BrowserUI`
+- `CLI`
 
 ```mermaid
 flowchart LR
-    UI["Browser UI"] --> API["HTTP API + WebSocket"]
-    CLI["CLI"] --> CORE["Core Runtime"]
+    UI[Browser UI] --> API[HTTP API + WebSocket]
+    CLI[CLI] --> CORE[Core Runtime]
     API --> CORE
-    CORE --> SM["Session Manager"]
-    CORE --> BUS["Event Bus"]
-    CORE --> STORE["Event Store"]
-    CORE --> ADAPTERS["Agent Adapters"]
-    ADAPTERS --> CODEX["Codex"]
-    ADAPTERS --> CLAUDE["Claude Code"]
-    ADAPTERS --> OPENCODE["OpenCode"]
-    ADAPTERS --> TMUX["tmux (when supported)"]
+    CORE --> SM[Session Manager]
+    CORE --> REDUCER[Session Reducer / Materializer]
+    CORE --> BUS[Event Bus]
+    CORE --> STORE[Event Store]
+    CORE --> ADAPTERS[Agent Adapters]
+    ADAPTERS --> CODEX[Codex]
+    ADAPTERS --> CLAUDE[Claude Code]
+    ADAPTERS --> OPENCODE[OpenCode]
 ```
 
-## 4. Recommended Source Layout
+## 5. Recommended Source Layout
 
 ```text
 src/
+  adapters/
+    base.ts
+    codex/
+    claude/
+    opencode/
+    fake/
   cli/
+  core/
+    auth/
+    config/
+    doctor/
+    event-store/
+    session-manager/
+    session-reducer/
+    retention/
   server/
     api/
     websocket/
+  shared/
+    contracts/
+    errors/
+    ids/
+    logging/
+    redaction/
   ui/
     app/
     routes/
     components/
-  core/
-    session-manager/
-    event-bus/
-    event-store/
-    doctor/
-    policies/
-  adapters/
-    base/
-    codex/
-    claude/
-    opencode/
-  shared/
-    schemas/
-    validation/
-    ids/
-    logging/
-    errors/
-test/
-  unit/
-  integration/
-  e2e/
-  live/
+    state/
+    transport/
+    styles/
 ```
 
-## 5. Core Domain Model
+The existing flatter file layout is acceptable temporarily, but the implementation should modularize toward these boundaries as code grows.
 
-## 5.1 Session Status
+## 6. Core Domain Model
 
-Required normalized session statuses:
+### 6.1 Session Status
 
+Required normalized statuses:
 - `starting`
 - `idle`
 - `running`
@@ -101,226 +115,186 @@ Required normalized session statuses:
 - `terminated`
 - `error`
 
-## 5.2 Session Lifecycle
+### 6.2 Session Identity
 
-```mermaid
-stateDiagram-v2
-    [*] --> starting
-    starting --> idle
-    starting --> error
-    idle --> running
-    running --> idle
-    running --> waiting_approval
-    running --> waiting_question
-    running --> waiting_plan
-    waiting_approval --> running
-    waiting_question --> running
-    waiting_plan --> running
-    idle --> restarting
-    running --> restarting
-    restarting --> idle
-    restarting --> error
-    idle --> terminating
-    running --> terminating
-    waiting_approval --> terminating
-    waiting_question --> terminating
-    waiting_plan --> terminating
-    terminating --> terminated
-    terminating --> error
-    error --> restarting
-```
-
-## 5.3 Session Identity
-
-A session id must be stable across:
-
+A normalized session id must remain stable across:
 - adapter restarts
 - mode changes
 - reconnects
 - daemon restarts
 
-The underlying vendor session id may change during recovery or restart, but that vendor id must be stored in adapter state and never replace the normalized session id.
+Vendor session identifiers are adapter-owned opaque state and must never replace the normalized session id.
 
-## 6. Session Manager
+### 6.3 Session Truth Model
+
+Each session has:
+- append-only normalized event log
+- latest materialized snapshot
+- derived summary view
+- adapter-owned opaque state
+- optional terminal mirror stream/log
+
+The reducer/materializer must be the only logic allowed to derive:
+- current status
+- pending action queue
+- visible mode/policy
+- summary timestamps and sequences
+- replay state after restart
+
+## 7. Session Manager
 
 `SessionManager` is responsible for:
-
 - creating sessions
-- resuming sessions
-- routing user input to the correct adapter
+- resuming/reconciling sessions on startup
+- routing user input
 - applying mode and policy changes
 - resolving pending actions
-- terminating sessions
-- materializing session summary state from events
+- terminating or force-terminating sessions
+- emitting normalized events
+- updating snapshots and active-session indexes
 
 Required behavior:
-
 - exactly one active runtime handle per normalized session id
-- per-session concurrency control so conflicting commands cannot mutate the same session simultaneously
-- stable summary rebuild from event replay
-- explicit timeouts for startup, restart, and terminate flows
+- per-session mutation serialization (queue/lock) so conflicting operations cannot interleave unsafely
+- explicit startup/restart/terminate timeouts
+- idempotent handling for client-submitted messages and create-session requests
+- startup reconciliation with adapters for non-terminated sessions
 
-## 7. Event Bus
+## 8. Session Reducer / Materializer
 
-The `EventBus` is the in-memory fan-out mechanism used by:
+A dedicated reducer/materializer is mandatory.
 
-- adapters
-- session manager
-- API handlers
-- WebSocket broadcasters
-- test fixtures
+It must:
+- accept normalized events in sequence order
+- produce the current `SessionDetail` and `SessionSummary`
+- rebuild truth from snapshot + event replay
+- tolerate replay after crash or daemon restart
+- invalidate or resolve pending actions correctly on later events
+
+No API route, websocket broadcaster, or UI code may reimplement its own session truth rules.
+
+## 9. Event Bus
+
+The `EventBus` is the in-memory fan-out layer between adapters, runtime services, websocket subscribers, and tests.
 
 Requirements:
+- publish/subscribe by session id
+- preserve per-session event ordering
+- tolerate slow consumers without corrupting runtime state
+- support internal subscribers used by tests and observability
 
-- publish and subscribe by session id
-- backpressure-safe broadcast to slow listeners
-- event ordering preserved per session
-- internal events may exist, but only normalized public events may leave the core boundary
+The bus is not the durable source of truth; it is a transient transport over durable event storage.
 
-## 8. Event Store
+## 10. Event Store
 
 The `EventStore` is the durable source of truth for session timelines.
 
-Requirements:
-
-- append-only per-session event log
+Required behavior:
+- append-only per-session JSONL event log
 - monotonic per-session sequence number
-- event id unique across all sessions
-- snapshot file for fast session list and recovery
-- replay API that can read from sequence cursor
-- crash-safe append behavior
+- unique event ids
+- latest snapshot per session
+- active-session index for fast startup
+- crash-safe append and atomic snapshot updates
+- replay from an exclusive cursor
+- trailing partial-line tolerance after crash
 
-Event replay must be sufficient to rebuild:
-
+Replay must be sufficient to rebuild:
 - transcript timeline
 - session status
-- pending action queue
-- terminal mirror
-- current mode
-- current execution policy
+- pending actions
+- mode and execution policy
+- visible terminal mirror history when retained
 
-## 9. Adapter Boundary
+## 11. Process And Transport Model
 
-Adapters are the only subsystem allowed to know vendor-specific launch flags, hooks, server APIs, config generation, or permission semantics.
-
-Core runtime responsibilities:
-
-- request normalized operations
-- receive normalized events
-- store opaque adapter state without inspecting vendor internals
-
-Adapter responsibilities:
-
-- translate normalized operations into vendor operations
-- map vendor events into normalized events
-- expose capability metadata
-- probe install and auth readiness
-
-## 10. Process Model
-
-There are two transport classes:
-
+Each adapter must declare one minimum releasable transport:
 - `pty`
-  - local interactive process, optionally managed through `tmux`
 - `http`
-  - local or loopback server API
 - `hybrid`
-  - both, depending on selected adapter options
+- `internal` (test-only adapters such as fake)
 
-`tmux` is the default attach substrate for `pty` and `hybrid` adapters that expose attach support.
+Optional affordances such as `tmux` attach or open-directory actions are capability-gated extras.
 
-The core runtime must not assume every adapter has:
+Rules:
+- the core runtime must not assume a pane, pid, or resumable terminal exists for every adapter
+- attach may only be exposed when the adapter explicitly reports support
+- lack of attach support must not block release of an otherwise functional adapter
 
-- a tmux pane
-- a local pid
-- a resumable terminal UI
-
-## 11. Recovery Model
+## 12. Recovery Model
 
 On daemon startup:
+1. load config and storage paths
+2. load snapshots and active-session index
+3. rebuild or validate summaries with reducer/materializer logic
+4. for each non-terminated session, ask the adapter to reconcile runtime state
+5. append explicit recovery, restart, or error events when reconciliation changes visible state
+6. accept websocket clients and serve replay from stored sequences
 
-1. Load config.
-2. Load active session snapshot index.
-3. For each non-terminated session, ask the adapter to reconcile runtime state.
-4. Append recovery or error events when reconciliation changes status.
-5. Reopen WebSocket broadcast streams for new browser connections.
+Recovery precedence:
+- event log wins over snapshot for sequence and pending-action truth
+- snapshot wins over active-session index for summary fields
+- adapter reconciliation may append new events but must not silently rewrite persisted history
 
-Recovery rules:
-
-- a session is never silently discarded
-- unrecoverable sessions transition to `error` with a visible reason
-- pending actions remain present until explicitly resolved or invalidated by an adapter event
-
-## 12. Web Server And UI Contract
+## 13. Web Server And UI Contract
 
 The web server must:
-
-- serve the SPA assets
-- expose the JSON API
-- expose the WebSocket event stream
-- enforce local auth
-- provide a health endpoint for live tests and daemon status
+- serve UI assets
+- expose JSON API routes
+- expose a WebSocket event stream
+- enforce local auth / password auth rules
+- expose health and doctor surfaces needed by CLI and tests
 
 The UI must:
+- fetch initial state from HTTP
+- apply live updates from WebSocket replay/event messages
+- reconnect from the last known per-session sequence
+- render only normalized state, not terminal parsing heuristics
 
-- treat the HTTP API as the source of initial state
-- treat the WebSocket as the source of live updates
-- be able to reconnect from the last known event cursor
+## 14. Security Boundaries
 
-## 13. Security Boundaries
+Required security rules:
+- default bind is `127.0.0.1`
+- non-loopback bind requires password auth
+- state-changing browser requests require CSRF protection
+- secrets are redacted before logs, doctor output, API responses, and persisted diagnostics
+- capability/policy displays must be honest about real adapter/runtime limits
+- adapter-specific option schemas must not create shell-injection paths
 
-The application is not a sandbox manager. It orchestrates agent runtimes and reflects their effective permissions.
+The application orchestrates agent runtimes. It does **not** provide a stronger sandbox than the underlying agent/runtime actually enforces.
 
-Required security boundaries:
+## 15. Logging And Observability
 
-- default bind `127.0.0.1`
-- explicit opt-in for non-loopback bind
-- password required for non-loopback bind
-- CSRF-safe local auth strategy for browser requests
-- dedicated auth session endpoints for browser bootstrapping and logout
-- secrets redaction in logs, doctor output, and API responses
-- no shell command injection from adapter-specific option schemas
-
-OpenCode-specific note:
-
-- OpenCode permissions are a user experience layer, not a substitute for OS sandboxing. The product must present effective permissions honestly and must not imply stronger isolation than the underlying runtime provides.
-
-## 14. Logging And Observability
-
-Required logs:
-
+Required persisted logs:
 - daemon lifecycle log
 - per-session event log
-- per-session terminal mirror log
+- per-session terminal mirror log when retained
 - adapter probe log
 
-Logging rules:
-
-- structured JSON for machine-readable logs
-- human-readable summaries for CLI doctor output
-- sensitive fields redacted before persistence
-
-Required metrics or counters:
-
+Required counters/metrics or equivalent observable summaries:
 - active session count
-- session start success and failure counts
+- session start success/failure counts
 - event append failures
-- WebSocket subscriber count
-- adapter probe health
+- websocket subscriber count
+- recovery attempts and failures
+- pruning actions
+- per-adapter probe health
 
-## 15. Non-Functional Requirements
+Logs must be structured and redact sensitive fields before persistence.
 
-- startup to ready dashboard on a warm machine in under 3 seconds
-- session creation should surface first visible state within 2 seconds when the adapter is locally healthy
-- event append and replay must remain reliable with at least 100 active sessions in retained history
-- browser refresh recovery must tolerate at least 10,000 events per session
+## 16. Non-Functional Requirements
 
-## 16. Extensibility Rules
+The shipped implementation must support:
+- warm startup to usable dashboard within 3 seconds on a healthy local machine
+- session creation to first visible state within 2 seconds when the adapter is healthy
+- reconnect to visible transcript within 2 seconds on a local machine
+- reliable replay with at least 10,000 events per session
+- reliable retained-history behavior with at least 100 active/recent sessions
 
-Future adapters may be added only if they implement the adapter contract and doctor contract defined in this spec.
+## 17. Extensibility Rules
 
-Future UI surfaces may be added, but they must not:
-
-- bypass normalized events
-- encode vendor-specific logic in generic components
-- require breaking API changes for the initial routes
+Future adapters or UI extensions may be added only if they:
+- preserve normalized contracts
+- do not bypass the reducer/materializer model
+- do not overstate capabilities
+- do not require breaking API changes for v1 routes

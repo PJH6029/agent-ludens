@@ -2,16 +2,16 @@
 
 ## 1. Storage Root
 
-The application stores its state under:
-
+The application stores durable state under:
 - `~/.codex-everywhere/`
 
-Required subpaths:
+Required layout:
 
 ```text
 ~/.codex-everywhere/
   config.json
   state/
+    doctor.json
     active-sessions.json
     session-events/
       <sessionId>.jsonl
@@ -19,251 +19,211 @@ Required subpaths:
       <sessionId>.json
     adapter/
       <adapterId>/
+        <sessionId>/
   logs/
     daemon.log
+    adapter-probe.log
     sessions/
       <sessionId>.log
   runtime/
     daemon.pid
     daemon-url.txt
   tmp/
+    <sessionId>/
 ```
 
 ## 2. Configuration File
 
 Main config path:
-
 - `~/.codex-everywhere/config.json`
 
-Secrets may be stored in this file only when no safer store is available, but they must be isolated under clear keys and never echoed in logs or browser responses.
+The config file is the durable source of truth for settings. Environment overrides may affect runtime behavior but must not silently rewrite the saved config.
 
 ## 3. Config Shape
 
-```json
-{
-  "server": {
-    "host": "127.0.0.1",
-    "port": 4319,
-    "openBrowser": true,
-    "authMode": "local-session",
-    "passwordHash": null
-  },
-  "agents": {
-    "defaultAgentId": "codex",
-    "codex": {},
-    "claude": {},
-    "opencode": {}
-  },
-  "sessions": {
-    "defaultMode": "build",
-    "defaultExecutionPolicy": {
-      "filesystem": "workspace-write",
-      "network": "on",
-      "approvals": "on-request",
-      "writableRoots": []
-    },
-    "titleStrategy": "from-initial-prompt",
-    "autoRecovery": true
-  },
-  "ui": {
-    "showTerminalMirrorByDefault": true,
-    "eventPageSize": 200
-  },
-  "retention": {
-    "maxRecentSessions": 200,
-    "pruneTerminalLogsAfterDays": 30,
-    "pruneEventsAfterDays": 90
-  }
-}
-```
+The config must support these top-level sections:
+- `server`
+- `agents`
+- `sessions`
+- `ui`
+- `retention`
+
+Required fields:
+- `server.host`
+- `server.port`
+- `server.openBrowser`
+- `server.authMode`
+- `server.passwordHash`
+- `agents.defaultAgentId`
+- per-adapter config buckets for `codex`, `claude`, and `opencode`
+- `sessions.defaultMode`
+- `sessions.defaultExecutionPolicy`
+- `sessions.titleStrategy`
+- `sessions.autoRecovery`
+- `ui.showTerminalMirrorByDefault`
+- `ui.eventPageSize`
+- `retention.maxRecentSessions`
+- `retention.pruneTerminalLogsAfterDays`
+- `retention.pruneEventsAfterDays`
 
 ## 4. Environment Overrides
 
-The implementation may support environment overrides, but they must obey:
-
-- environment overrides are optional
-- config file remains the durable source of truth
-- secrets from environment must not be persisted unless explicitly requested
-
-Recommended overrides:
-
+Environment overrides are optional and may support keys such as:
 - `CODEX_EVERYWHERE_HOST`
 - `CODEX_EVERYWHERE_PORT`
 - `CODEX_EVERYWHERE_OPEN_BROWSER`
 - `CODEX_EVERYWHERE_AUTH_MODE`
 
+Rules:
+- config file remains the durable source of truth
+- env-provided secrets are not persisted unless explicitly requested
+- runtime validation still applies after overrides are merged
+
 ## 5. Settings Mutability
 
-Runtime-updatable settings:
-
+Runtime-updatable settings may include:
 - host
 - port
 - auth mode
 - retention
 - UI preferences
 
-Settings that may require daemon restart must return:
-
+The settings API must report:
+- the updated safe settings payload
 - whether restart is required
-- what setting triggered it
+- which changed fields triggered restart requirements
 
 ## 6. Session Snapshot
 
-Each active or retained session must have a materialized snapshot file:
+Each active or retained session must have a latest materialized snapshot.
 
-```json
-{
-  "id": "ses_01H...",
-  "title": "Refactor auth middleware",
-  "agentId": "codex",
-  "status": "idle",
-  "mode": "build",
-  "cwd": "/workspace/app",
-  "executionPolicy": {},
-  "pendingActions": [],
-  "lastSequence": 42,
-  "createdAt": "2026-03-29T10:00:00.000Z",
-  "updatedAt": "2026-03-29T10:01:00.000Z",
-  "adapterState": {
-    "vendorSessionId": "opaque"
-  }
-}
-```
+Required fields include:
+- normalized id
+- title
+- agent id
+- status
+- mode
+- cwd
+- execution policy
+- pending actions
+- last sequence
+- created/updated timestamps
+- adapter-owned opaque state
 
 Rules:
-
-- `adapterState` is opaque outside the adapter
 - snapshot updates must be atomic
-- snapshot must be reconstructible from event replay if lost
+- snapshot must be reconstructible from replay if lost
+- browser-facing APIs may redact or omit adapter-owned opaque fields when needed
 
 ## 7. Session Event Log
 
-Each session has an append-only JSONL file:
-
-- `state/session-events/<sessionId>.jsonl`
-
-Each line must be one `SessionEvent`.
+Each session has an append-only JSONL event log.
 
 Rules:
-
 - events are written in ascending sequence order
 - events are never edited in place
-- event replay must tolerate trailing partial lines after crash and ignore them safely
+- replay must tolerate trailing partial lines after crash and ignore them safely
+- events remain the highest-priority source for replay truth
 
 ## 8. Active Session Index
 
-`state/active-sessions.json` contains lightweight metadata for quick startup:
-
-```json
-{
-  "items": [
-    {
-      "id": "ses_01H...",
-      "status": "running",
-      "agentId": "codex",
-      "updatedAt": "2026-03-29T10:01:00.000Z"
-    }
-  ]
-}
-```
+`state/active-sessions.json` is an optimization for startup and dashboard rendering.
 
 Rules:
+- it is not the ultimate source of truth
+- if missing or stale, it must be rebuilt from snapshots/events
+- terminated sessions may be excluded from the active index while still remaining retained elsewhere
 
-- this is an optimization, not the ultimate source of truth
-- if the file is missing or stale, rebuild it from snapshots
+## 9. Adapter State And Temp Namespaces
 
-## 9. Log Files
+Each adapter may persist opaque adapter-owned state under:
+- `state/adapter/<adapterId>/<sessionId>/`
 
-Required logs:
+Temporary per-session artifacts live under:
+- `tmp/<sessionId>/`
 
+Temp artifacts may include:
+- generated config files
+- hook files
+- wrapper scripts
+- local sockets or pid markers
+
+Rules:
+- each session gets its own temp namespace
+- stale temp files must not block recovery
+- cleanup should run on terminate, but recovery must tolerate leftovers safely
+
+## 10. Log Files
+
+Required persisted logs:
 - `logs/daemon.log`
+- `logs/adapter-probe.log`
 - `logs/sessions/<sessionId>.log`
 
 Daemon log should include:
-
-- startup
-- shutdown
+- startup/shutdown
 - bind info
-- doctor results
-- unhandled errors
+- doctor summary
+- unhandled runtime errors
+- pruning activity
 
 Session log should include:
-
 - adapter lifecycle
-- terminal mirror summary
-- policy changes
-- mode changes
-- terminate flow
+- policy/mode changes
+- recovery actions
+- termination flow
+- notable adapter/runtime errors
 
-## 10. Secrets Handling
+## 11. Secrets Handling
 
-The system may hold:
-
-- local auth secret
-- optional password hash
-- adapter-specific tokens or paths if needed
-
-Rules:
-
-- store password as a hash, never plaintext
-- redact secrets from browser responses
-- redact secrets from structured logs
-- adapter-owned temporary files containing secrets must live under `tmp/` or adapter storage and be deleted when no longer needed
-
-## 11. Temporary Files
-
-Temporary per-session artifacts may include:
-
-- generated config files
-- generated hook files
-- generated shell wrappers
-- temporary sockets or pid markers
+Possible secret-like data includes:
+- local auth secret or session token material
+- password hash
+- adapter-specific tokens or auth hints
+- generated config fragments containing credentials
 
 Rules:
-
-- each session gets its own temp namespace
-- temp files must be safe to recreate
-- cleanup should happen on terminate, but stale temp files must not block recovery
+- passwords are stored only as hashes
+- secrets must be redacted from logs, doctor payloads, API responses, and saved diagnostics
+- temporary secret-bearing files must be isolated and cleaned up when safe
 
 ## 12. Retention And Pruning
 
-Required retention behaviors:
+Required retention behavior:
+- keep recent session snapshots after termination
+- prune terminal mirror logs earlier than normalized events when configured
+- never prune active sessions
+- retain at least the latest snapshot for each retained session
+- log pruning actions visibly
 
-- keep recent session snapshots even after termination
-- prune terminal logs sooner than normalized events
-- do not prune active sessions
-- pruning must be explicit and observable in logs
-
-Pruning must not remove:
-
-- the latest snapshot of a retained session
-- normalized events still needed for recent UI history or live-test assertions
+Pruning must not remove data still required for:
+- replay of retained UI history
+- release evidence or live-test assertions within the retention window
 
 ## 13. Recovery Rules
 
-On startup:
-
+On startup the runtime must:
 - validate config
-- load active session index if present
-- load snapshots
-- reconcile sessions with adapters
-- recover WebSocket cursors from event sequences only, not from browser memory
+- load snapshots and active-session index
+- rebuild or validate session summaries through the reducer/materializer
+- reconcile non-terminated sessions with adapters
+- rebuild replay truth from persisted sequences, not browser memory
 
-If files disagree:
-
+Precedence rules:
 - event log wins over snapshot for sequence and pending-action truth
 - snapshot wins over active-session index for summary fields
+- adapter reconciliation may append new events, but must not silently mutate prior persisted history
 
 ## 14. Validation Requirements
 
 All config and storage reads must use runtime validation.
 
 Required validation targets:
-
 - config file
-- snapshot file
-- event line shape
-- pending action payload
+- snapshot files
+- event lines
+- active-session index
+- pending action payloads
 - adapter option payloads
 
-Validation failures must be explicit and recoverable where possible.
+Validation failures must be explicit, diagnosable, and recoverable where possible.
