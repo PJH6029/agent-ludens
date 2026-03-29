@@ -2,12 +2,14 @@
 
 ## 1. Testing goals
 
-Production-ready v0 needs proof at four layers:
+Production-ready v0 needs proof at four layers, plus one browser-accessibility check for the
+shipped local operator surface:
 
 1. static quality gates
 2. unit tests for pure logic and invariants
 3. integration and fake-adapter end-to-end tests
 4. opt-in live tests against the real Codex CLI
+5. browser-driven verification of the mounted local `/ui` surface
 
 ## 2. Release gates
 
@@ -105,6 +107,10 @@ Required live scenarios:
 3. final agreed live peer/runtime proof if the environment supports it
 4. a Playwright/browser-driven live verification path that exercises the running runtime from a browser surface
 
+This browser proof is intentionally narrow: it confirms that the shipped local browser path
+is reachable and shows live runtime information. It does not promote a richer owner-web-app
+workflow to normative v0 scope.
+
 ## 5. Live prerequisites
 
 Live tests are opt-in because they depend on local environment state.
@@ -197,5 +203,8 @@ Release evidence should include:
 
 ## 8. Deferred testing work
 
-Browser/UI tests and marketplace tests are explicitly deferred because those product surfaces
-are not part of production-ready v0.
+The following remain deferred:
+
+- richer browser-native workflows beyond the minimal mounted local `/ui` verification path
+- marketplace and delegation-economy testing
+- multi-machine or internet-facing browser scenarios

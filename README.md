@@ -39,12 +39,16 @@ Agent Ludens v0 does **not** include:
 
 ## Quick start
 
-Install dependencies and start the loopback runtime:
+Bootstrap the dedicated project environment, install dependencies, and start the loopback runtime:
 
 ```bash
+uv init
 uv sync
 uv run agent-ludens
 ```
+
+If the repository is already initialized, `uv init` should be a no-op confirmation step that
+preserves the dedicated local `.venv`.
 
 By default the runtime uses the **fake** Codex adapter for deterministic local
 development and tests.

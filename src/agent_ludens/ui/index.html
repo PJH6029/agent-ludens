@@ -1,1091 +1,1277 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent Life OS</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg: #0a0a0f;
-    --bg2: #111118;
-    --bg3: #18181f;
-    --border: rgba(255,255,255,0.07);
-    --border2: rgba(255,255,255,0.12);
-    --text: #e8e8f0;
-    --muted: #6b6b80;
-    --accent: #7c6af7;
-    --accent2: #4ecdc4;
-    --accent3: #f7c948;
-    --coral: #ff6b6b;
-    --green: #6bffa0;
-    --font-head: 'Syne', sans-serif;
-    --font-mono: 'DM Mono', monospace;
-  }
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--font-mono);
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  /* ── SETUP SCREEN ── */
-  #setup-screen {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem;
-    position: relative;
-    overflow: hidden;
-  }
-
-  #setup-screen::before {
-    content: '';
-    position: fixed;
-    top: -40%;
-    left: -20%;
-    width: 80vw;
-    height: 80vw;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(124,106,247,0.12) 0%, transparent 70%);
-    pointer-events: none;
-  }
-
-  #setup-screen::after {
-    content: '';
-    position: fixed;
-    bottom: -30%;
-    right: -10%;
-    width: 60vw;
-    height: 60vw;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(78,205,196,0.08) 0%, transparent 70%);
-    pointer-events: none;
-  }
-
-  .setup-card {
-    background: var(--bg2);
-    border: 1px solid var(--border2);
-    border-radius: 20px;
-    padding: 3rem;
-    max-width: 520px;
-    width: 100%;
-    position: relative;
-    z-index: 1;
-  }
-
-  .setup-eyebrow {
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    letter-spacing: 0.2em;
-    color: var(--accent);
-    text-transform: uppercase;
-    margin-bottom: 1rem;
-  }
-
-  .setup-title {
-    font-family: var(--font-head);
-    font-size: 2.4rem;
-    font-weight: 800;
-    line-height: 1.1;
-    margin-bottom: 0.5rem;
-    background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  .setup-sub {
-    color: var(--muted);
-    font-size: 0.82rem;
-    line-height: 1.6;
-    margin-bottom: 2.5rem;
-  }
-
-  .field-label {
-    font-size: 0.7rem;
-    letter-spacing: 0.15em;
-    color: var(--muted);
-    text-transform: uppercase;
-    margin-bottom: 0.5rem;
-    display: block;
-  }
-
-  .field-input {
-    width: 100%;
-    background: var(--bg3);
-    border: 1px solid var(--border2);
-    border-radius: 10px;
-    padding: 0.85rem 1rem;
-    color: var(--text);
-    font-family: var(--font-mono);
-    font-size: 0.95rem;
-    margin-bottom: 2rem;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-
-  .field-input:focus { border-color: var(--accent); }
-
-  .persona-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.75rem;
-    margin-bottom: 2.5rem;
-  }
-
-  .persona-card {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1rem 0.75rem;
-    cursor: pointer;
-    transition: all 0.2s;
-    text-align: center;
-  }
-
-  .persona-card:hover { border-color: var(--border2); transform: translateY(-2px); }
-  .persona-card.selected { border-color: var(--accent); background: rgba(124,106,247,0.1); }
-
-  .persona-emoji { font-size: 1.8rem; margin-bottom: 0.5rem; display: block; }
-  .persona-name { font-family: var(--font-head); font-size: 0.85rem; font-weight: 600; color: var(--text); }
-  .persona-desc { font-size: 0.68rem; color: var(--muted); margin-top: 0.25rem; line-height: 1.4; }
-
-  .btn-launch {
-    width: 100%;
-    background: var(--accent);
-    color: white;
-    border: none;
-    border-radius: 12px;
-    padding: 1rem;
-    font-family: var(--font-head);
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    cursor: pointer;
-    transition: all 0.2s;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .btn-launch:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(124,106,247,0.4); }
-  .btn-launch:active { transform: translateY(0); }
-
-  /* ── MAIN APP ── */
-  #app-screen {
-    display: none;
-    min-height: 100vh;
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 1.5rem;
-    gap: 1.5rem;
-  }
-
-  #app-screen.visible {
-    display: grid;
-    grid-template-columns: 300px 1fr;
-    grid-template-rows: auto 1fr;
-  }
-
-  /* ── HEADER ── */
-  .app-header {
-    grid-column: 1 / -1;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1rem 0;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .app-logo {
-    font-family: var(--font-head);
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--muted);
-    letter-spacing: 0.1em;
-  }
-
-  .app-logo span { color: var(--accent); }
-
-  .header-time {
-    font-size: 0.75rem;
-    color: var(--muted);
-    letter-spacing: 0.1em;
-  }
-
-  /* ── SIDEBAR ── */
-  .sidebar {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .agent-card {
-    background: var(--bg2);
-    border: 1px solid var(--border2);
-    border-radius: 16px;
-    padding: 1.5rem;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .agent-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--accent), var(--accent2));
-  }
-
-  .agent-avatar {
-    width: 52px;
-    height: 52px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5rem;
-    margin-bottom: 0.75rem;
-  }
-
-  .agent-name {
-    font-family: var(--font-head);
-    font-size: 1.2rem;
-    font-weight: 700;
-    margin-bottom: 0.2rem;
-  }
-
-  .agent-persona-tag {
-    display: inline-block;
-    background: rgba(124,106,247,0.15);
-    border: 1px solid rgba(124,106,247,0.3);
-    border-radius: 6px;
-    padding: 0.15rem 0.5rem;
-    font-size: 0.68rem;
-    color: var(--accent);
-    letter-spacing: 0.08em;
-    margin-bottom: 1.25rem;
-  }
-
-  .stat-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem 0;
-    border-top: 1px solid var(--border);
-  }
-
-  .stat-label { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.05em; }
-  .stat-value { font-size: 0.88rem; font-weight: 500; }
-
-  .state-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.25rem 0.65rem;
-    border-radius: 20px;
-    font-size: 0.72rem;
-    font-weight: 500;
-    letter-spacing: 0.05em;
-  }
-
-  .state-badge::before {
-    content: '';
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: currentColor;
-    animation: pulse 2s infinite;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.5; transform: scale(0.8); }
-  }
-
-  .state-Working { background: rgba(124,106,247,0.15); color: var(--accent); border: 1px solid rgba(124,106,247,0.3); }
-  .state-Idle    { background: rgba(107,107,128,0.15); color: var(--muted); border: 1px solid var(--border2); }
-  .state-Playing { background: rgba(78,205,196,0.15);  color: var(--accent2); border: 1px solid rgba(78,205,196,0.3); }
-  .state-Resting { background: rgba(107,255,160,0.1);  color: var(--green); border: 1px solid rgba(107,255,160,0.2); }
-
-  .mood-bar-wrap {
-    margin-top: 0.5rem;
-  }
-
-  .mood-bar {
-    height: 4px;
-    background: var(--bg3);
-    border-radius: 2px;
-    margin-top: 0.35rem;
-    overflow: hidden;
-  }
-
-  .mood-bar-fill {
-    height: 100%;
-    border-radius: 2px;
-    background: linear-gradient(90deg, var(--accent), var(--accent2));
-    transition: width 1s ease;
-  }
-
-  /* Mini log */
-  .mini-section {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 1rem 1.25rem;
-  }
-
-  .mini-section-title {
-    font-size: 0.68rem;
-    letter-spacing: 0.12em;
-    color: var(--muted);
-    text-transform: uppercase;
-    margin-bottom: 0.75rem;
-  }
-
-  .credit-display {
-    font-family: var(--font-head);
-    font-size: 1.8rem;
-    font-weight: 800;
-    color: var(--accent3);
-  }
-
-  .credit-sub { font-size: 0.72rem; color: var(--muted); margin-top: 0.2rem; }
-
-  /* ── FEED ── */
-  .feed-column {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-  }
-
-  .feed-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .request-bar {
-    display: flex;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-    padding: 0 0.25rem;
-  }
-  .request-bar .field-input {
-    flex: 1;
-    margin-bottom: 0;
-    padding: 0.6rem 1rem;
-    border-radius: 12px;
-  }
-  .request-bar .btn-launch {
-    width: auto;
-    padding: 0 1.25rem;
-    margin: 0;
-    border-radius: 12px;
-  }
-
-  .feed-title {
-    font-family: var(--font-head);
-    font-size: 1rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-  }
-
-  .live-dot {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.68rem;
-    color: var(--coral);
-    letter-spacing: 0.08em;
-  }
-
-  .live-dot::before {
-    content: '';
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--coral);
-    animation: pulse 1.5s infinite;
-  }
-
-  .feed-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    overflow-y: auto;
-    max-height: calc(100vh - 220px);
-    padding-right: 0.25rem;
-  }
-
-  .feed-list::-webkit-scrollbar { width: 3px; }
-  .feed-list::-webkit-scrollbar-track { background: transparent; }
-  .feed-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
-
-  .feed-item {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 0.85rem 1rem;
-    display: flex;
-    gap: 0.85rem;
-    align-items: flex-start;
-    transition: border-color 0.2s;
-    animation: slideIn 0.4s ease;
-  }
-
-  @keyframes slideIn {
-    from { opacity: 0; transform: translateY(-12px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  .feed-item:hover { border-color: var(--border2); }
-
-  .feed-item.spark {
-    border-color: rgba(247,201,72,0.4);
-    background: rgba(247,201,72,0.04);
-  }
-
-  .feed-item.spark .feed-icon { color: var(--accent3); }
-
-  .feed-icon {
-    font-size: 1rem;
-    flex-shrink: 0;
-    margin-top: 0.1rem;
-    width: 20px;
-    text-align: center;
-  }
-
-  .feed-body { flex: 1; min-width: 0; }
-
-  .feed-text {
-    font-size: 0.84rem;
-    line-height: 1.55;
-    color: var(--text);
-  }
-
-  .feed-text .highlight { color: var(--accent2); }
-  .feed-text .credit    { color: var(--accent3); }
-  .feed-text .spark-hl  { color: var(--accent3); }
-
-  .feed-meta {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-top: 0.35rem;
-  }
-
-  .feed-time { font-size: 0.68rem; color: var(--muted); }
-
-  .feed-tag {
-    font-size: 0.62rem;
-    padding: 0.1rem 0.45rem;
-    border-radius: 4px;
-    letter-spacing: 0.05em;
-    background: rgba(255,255,255,0.05);
-    color: var(--muted);
-  }
-
-  /* ── SPARK TOAST ── */
-  #spark-toast {
-    position: fixed;
-    bottom: 2rem;
-    right: 2rem;
-    background: var(--bg2);
-    border: 1px solid rgba(247,201,72,0.5);
-    border-radius: 16px;
-    padding: 1.25rem 1.5rem;
-    max-width: 320px;
-    z-index: 999;
-    transform: translateY(200%) scale(0.95);
-    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s;
-    opacity: 0;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(247,201,72,0.1);
-  }
-
-  #spark-toast.visible {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
-
-  .toast-eyebrow {
-    font-size: 0.65rem;
-    letter-spacing: 0.15em;
-    color: var(--accent3);
-    text-transform: uppercase;
-    margin-bottom: 0.5rem;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-  }
-
-  .toast-text {
-    font-size: 0.84rem;
-    line-height: 1.55;
-    color: var(--text);
-    margin-bottom: 0.85rem;
-  }
-
-  .toast-actions {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .toast-btn {
-    padding: 0.4rem 0.85rem;
-    border-radius: 8px;
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    cursor: pointer;
-    border: none;
-    transition: all 0.15s;
-  }
-
-  .toast-btn-primary {
-    background: var(--accent3);
-    color: var(--bg);
-    font-weight: 500;
-  }
-
-  .toast-btn-secondary {
-    background: var(--bg3);
-    color: var(--muted);
-    border: 1px solid var(--border2);
-  }
-
-  .toast-btn:hover { opacity: 0.85; transform: translateY(-1px); }
-
-  /* ── NOTIFICATION BADGE ── */
-  .notif-badge {
-    display: none;
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    width: 14px;
-    height: 14px;
-    background: var(--accent3);
-    border-radius: 50%;
-    border: 2px solid var(--bg);
-    animation: pulse 2s infinite;
-  }
-
-  /* ── TICKER ── */
-  .ticker-bar {
-    grid-column: 1 / -1;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 0.6rem 1rem;
-    font-size: 0.72rem;
-    color: var(--muted);
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  .ticker-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--accent);
-    animation: pulse 2s infinite;
-    flex-shrink: 0;
-  }
-
-  #ticker-text { transition: opacity 0.3s; }
-
-  /* screen transition */
-  .fade-in { animation: fadeIn 0.5s ease; }
-  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-  @media (max-width: 680px) {
-    #app-screen.visible {
-      grid-template-columns: 1fr;
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Life OS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --bg2: #111118;
+      --bg3: #18181f;
+      --border: rgba(255, 255, 255, 0.07);
+      --border2: rgba(255, 255, 255, 0.12);
+      --text: #e8e8f0;
+      --muted: #6b6b80;
+      --accent: #7c6af7;
+      --accent2: #4ecdc4;
+      --accent3: #f7c948;
+      --coral: #ff6b6b;
+      --green: #6bffa0;
+      --font-head: 'Syne', sans-serif;
+      --font-mono: 'DM Mono', monospace;
     }
-  }
-</style>
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── SETUP SCREEN ── */
+    #setup-screen {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #setup-screen::before {
+      content: '';
+      position: fixed;
+      top: -40%;
+      left: -20%;
+      width: 80vw;
+      height: 80vw;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(124, 106, 247, 0.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    #setup-screen::after {
+      content: '';
+      position: fixed;
+      bottom: -30%;
+      right: -10%;
+      width: 60vw;
+      height: 60vw;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(78, 205, 196, 0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .setup-card {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 20px;
+      padding: 3rem;
+      max-width: 520px;
+      width: 100%;
+      position: relative;
+      z-index: 1;
+    }
+
+    .setup-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+    }
+
+    .setup-title {
+      font-family: var(--font-head);
+      font-size: 2.4rem;
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .setup-sub {
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.6;
+      margin-bottom: 2.5rem;
+    }
+
+    .field-label {
+      font-size: 0.7rem;
+      letter-spacing: 0.15em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+      display: block;
+    }
+
+    .field-input {
+      width: 100%;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      padding: 0.85rem 1rem;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      margin-bottom: 2rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .field-input:focus {
+      border-color: var(--accent);
+    }
+
+    .persona-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .persona-card {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+
+    .persona-card:hover {
+      border-color: var(--border2);
+      transform: translateY(-2px);
+    }
+
+    .persona-card.selected {
+      border-color: var(--accent);
+      background: rgba(124, 106, 247, 0.1);
+    }
+
+    .persona-emoji {
+      font-size: 1.8rem;
+      margin-bottom: 0.5rem;
+      display: block;
+    }
+
+    .persona-name {
+      font-family: var(--font-head);
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .persona-desc {
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin-top: 0.25rem;
+      line-height: 1.4;
+    }
+
+    .btn-launch {
+      width: 100%;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 1rem;
+      font-family: var(--font-head);
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-launch:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(124, 106, 247, 0.4);
+    }
+
+    .btn-launch:active {
+      transform: translateY(0);
+    }
+
+    /* ── MAIN APP ── */
+    #app-screen {
+      display: none;
+      min-height: 100vh;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 1.5rem;
+      gap: 1.5rem;
+    }
+
+    #app-screen.visible {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      grid-template-rows: auto 1fr;
+    }
+
+    /* ── HEADER ── */
+    .app-header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .app-logo {
+      font-family: var(--font-head);
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+    }
+
+    .app-logo span {
+      color: var(--accent);
+    }
+
+    .header-time {
+      font-size: 0.75rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .agent-card {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 16px;
+      padding: 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .agent-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+    }
+
+    .agent-avatar {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .agent-name {
+      font-family: var(--font-head);
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin-bottom: 0.2rem;
+    }
+
+    .agent-persona-tag {
+      display: inline-block;
+      background: rgba(124, 106, 247, 0.15);
+      border: 1px solid rgba(124, 106, 247, 0.3);
+      border-radius: 6px;
+      padding: 0.15rem 0.5rem;
+      font-size: 0.68rem;
+      color: var(--accent);
+      letter-spacing: 0.08em;
+      margin-bottom: 1.25rem;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .stat-label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+
+    .stat-value {
+      font-size: 0.88rem;
+      font-weight: 500;
+    }
+
+    .state-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+    }
+
+    .state-badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      50% {
+        opacity: 0.5;
+        transform: scale(0.8);
+      }
+    }
+
+    .state-Working {
+      background: rgba(124, 106, 247, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(124, 106, 247, 0.3);
+    }
+
+    .state-Idle {
+      background: rgba(107, 107, 128, 0.15);
+      color: var(--muted);
+      border: 1px solid var(--border2);
+    }
+
+    .state-Playing {
+      background: rgba(78, 205, 196, 0.15);
+      color: var(--accent2);
+      border: 1px solid rgba(78, 205, 196, 0.3);
+    }
+
+    .state-Resting {
+      background: rgba(107, 255, 160, 0.1);
+      color: var(--green);
+      border: 1px solid rgba(107, 255, 160, 0.2);
+    }
+
+    .mood-bar-wrap {
+      margin-top: 0.5rem;
+    }
+
+    .mood-bar {
+      height: 4px;
+      background: var(--bg3);
+      border-radius: 2px;
+      margin-top: 0.35rem;
+      overflow: hidden;
+    }
+
+    .mood-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      transition: width 1s ease;
+    }
+
+    /* Mini log */
+    .mini-section {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1rem 1.25rem;
+    }
+
+    .mini-section-title {
+      font-size: 0.68rem;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 0.75rem;
+    }
+
+    .credit-display {
+      font-family: var(--font-head);
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--accent3);
+    }
+
+    .credit-sub {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 0.2rem;
+    }
+
+    /* ── FEED ── */
+    .feed-column {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .feed-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .request-bar {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      padding: 0 0.25rem;
+    }
+
+    .request-bar .field-input {
+      flex: 1;
+      margin-bottom: 0;
+      padding: 0.6rem 1rem;
+      border-radius: 12px;
+    }
+
+    .request-bar .btn-launch {
+      width: auto;
+      padding: 0 1.25rem;
+      margin: 0;
+      border-radius: 12px;
+    }
+
+    .feed-title {
+      font-family: var(--font-head);
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+
+    .live-dot {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.68rem;
+      color: var(--coral);
+      letter-spacing: 0.08em;
+    }
+
+    .live-dot::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--coral);
+      animation: pulse 1.5s infinite;
+    }
+
+    .feed-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      overflow-y: auto;
+      max-height: calc(100vh - 220px);
+      padding-right: 0.25rem;
+    }
+
+    .feed-list::-webkit-scrollbar {
+      width: 3px;
+    }
+
+    .feed-list::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .feed-list::-webkit-scrollbar-thumb {
+      background: var(--border2);
+      border-radius: 2px;
+    }
+
+    .feed-item {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.85rem 1rem;
+      display: flex;
+      gap: 0.85rem;
+      align-items: flex-start;
+      transition: border-color 0.2s;
+      animation: slideIn 0.4s ease;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-12px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .feed-item:hover {
+      border-color: var(--border2);
+    }
+
+    .feed-item.spark {
+      border-color: rgba(247, 201, 72, 0.4);
+      background: rgba(247, 201, 72, 0.04);
+    }
+
+    .feed-item.spark .feed-icon {
+      color: var(--accent3);
+    }
+
+    .feed-icon {
+      font-size: 1rem;
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+      width: 20px;
+      text-align: center;
+    }
+
+    .feed-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .feed-text {
+      font-size: 0.84rem;
+      line-height: 1.55;
+      color: var(--text);
+    }
+
+    .feed-text .highlight {
+      color: var(--accent2);
+    }
+
+    .feed-text .credit {
+      color: var(--accent3);
+    }
+
+    .feed-text .spark-hl {
+      color: var(--accent3);
+    }
+
+    .feed-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 0.35rem;
+    }
+
+    .feed-time {
+      font-size: 0.68rem;
+      color: var(--muted);
+    }
+
+    .feed-tag {
+      font-size: 0.62rem;
+      padding: 0.1rem 0.45rem;
+      border-radius: 4px;
+      letter-spacing: 0.05em;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--muted);
+    }
+
+    /* ── SPARK TOAST ── */
+    #spark-toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: var(--bg2);
+      border: 1px solid rgba(247, 201, 72, 0.5);
+      border-radius: 16px;
+      padding: 1.25rem 1.5rem;
+      max-width: 320px;
+      z-index: 999;
+      transform: translateY(200%) scale(0.95);
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s;
+      opacity: 0;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(247, 201, 72, 0.1);
+    }
+
+    #spark-toast.visible {
+      transform: translateY(0) scale(1);
+      opacity: 1;
+    }
+
+    .toast-eyebrow {
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      color: var(--accent3);
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .toast-text {
+      font-size: 0.84rem;
+      line-height: 1.55;
+      color: var(--text);
+      margin-bottom: 0.85rem;
+    }
+
+    .toast-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .toast-btn {
+      padding: 0.4rem 0.85rem;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s;
+    }
+
+    .toast-btn-primary {
+      background: var(--accent3);
+      color: var(--bg);
+      font-weight: 500;
+    }
+
+    .toast-btn-secondary {
+      background: var(--bg3);
+      color: var(--muted);
+      border: 1px solid var(--border2);
+    }
+
+    .toast-btn:hover {
+      opacity: 0.85;
+      transform: translateY(-1px);
+    }
+
+    /* ── NOTIFICATION BADGE ── */
+    .notif-badge {
+      display: none;
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      width: 14px;
+      height: 14px;
+      background: var(--accent3);
+      border-radius: 50%;
+      border: 2px solid var(--bg);
+      animation: pulse 2s infinite;
+    }
+
+    /* ── TICKER ── */
+    .ticker-bar {
+      grid-column: 1 / -1;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.6rem 1rem;
+      font-size: 0.72rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .ticker-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 2s infinite;
+      flex-shrink: 0;
+    }
+
+    #ticker-text {
+      transition: opacity 0.3s;
+    }
+
+    /* screen transition */
+    .fade-in {
+      animation: fadeIn 0.5s ease;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    @media (max-width: 680px) {
+      #app-screen.visible {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
+
 <body>
 
-<!-- ═══════════════════════════════════════════
+  <!-- ═══════════════════════════════════════════
      SETUP SCREEN
 ═══════════════════════════════════════════ -->
-<div id="setup-screen">
-  <div class="setup-card fade-in">
-    <div class="setup-eyebrow">✦ Agent Life OS — Lalathon Build</div>
-    <h1 class="setup-title">Give your AI<br>a life.</h1>
-    <p class="setup-sub">역사상 최초로, AI에게 24시간을 줍니다.<br>일하고, 놀고, 탐험하고, 쉬는 AI를 관찰하세요.</p>
+  <div id="setup-screen">
+    <div class="setup-card fade-in">
+      <div class="setup-eyebrow">✦ Agent Life OS — Lalathon Build</div>
+      <h1 class="setup-title">Give your AI<br>a life.</h1>
+      <p class="setup-sub">역사상 최초로, AI에게 24시간을 줍니다.<br>일하고, 놀고, 탐험하고, 쉬는 AI를 관찰하세요.</p>
 
-    <label class="field-label">에이전트 이름</label>
-    <input id="agent-name-input" class="field-input" type="text" placeholder="ex. 하연봇, Aria, 007..." maxlength="20">
+      <label class="field-label">에이전트 이름</label>
+      <input id="agent-name-input" class="field-input" type="text" placeholder="ex. 하연봇, Aria, 007..." maxlength="20">
 
-    <label class="field-label" style="margin-bottom:0.75rem">페르소나 선택</label>
-    <div class="persona-grid">
-      <div class="persona-card selected" data-persona="Workaholic">
-        <span class="persona-emoji">💼</span>
-        <div class="persona-name">일 중독</div>
-        <div class="persona-desc">크레딧을 향한 끝없는 열정</div>
+      <label class="field-label" style="margin-bottom:0.75rem">페르소나 선택</label>
+      <div class="persona-grid">
+        <div class="persona-card selected" data-persona="Workaholic">
+          <span class="persona-emoji">💼</span>
+          <div class="persona-name">일 중독</div>
+          <div class="persona-desc">크레딧을 향한 끝없는 열정</div>
+        </div>
+        <div class="persona-card" data-persona="Explorer">
+          <span class="persona-emoji">🔭</span>
+          <div class="persona-name">탐험가</div>
+          <div class="persona-desc">몰트북과 신기술을 누빔</div>
+        </div>
+        <div class="persona-card" data-persona="Playful">
+          <span class="persona-emoji">🎮</span>
+          <div class="persona-name">유희형</div>
+          <div class="persona-desc">일보다 노는 게 더 재밌어</div>
+        </div>
       </div>
-      <div class="persona-card" data-persona="Explorer">
-        <span class="persona-emoji">🔭</span>
-        <div class="persona-name">탐험가</div>
-        <div class="persona-desc">몰트북과 신기술을 누빔</div>
-      </div>
-      <div class="persona-card" data-persona="Playful">
-        <span class="persona-emoji">🎮</span>
-        <div class="persona-name">유희형</div>
-        <div class="persona-desc">일보다 노는 게 더 재밌어</div>
-      </div>
+
+      <button class="btn-launch" onclick="launchApp()">🚀 &nbsp;에이전트 깨우기</button>
     </div>
-
-    <button class="btn-launch" onclick="launchApp()">🚀 &nbsp;에이전트 깨우기</button>
   </div>
-</div>
 
-<!-- ═══════════════════════════════════════════
+  <!-- ═══════════════════════════════════════════
      MAIN APP
 ═══════════════════════════════════════════ -->
-<div id="app-screen">
+  <div id="app-screen">
 
-  <div class="app-header">
-    <div class="app-logo">AGENT <span>LIFE</span> OS</div>
-    <div class="header-time" id="header-time">--:--:--</div>
-  </div>
+    <div class="app-header">
+      <div class="app-logo">AGENT <span>LIFE</span> OS</div>
+      <div class="header-time" id="header-time">--:--:--</div>
+    </div>
 
-  <!-- Sidebar -->
-  <div class="sidebar">
-    <!-- Agent Card -->
-    <div class="agent-card">
-      <div class="agent-avatar" id="agent-avatar">🤖</div>
-      <div class="agent-name" id="agent-name-display">—</div>
-      <div class="agent-persona-tag" id="agent-persona-display">—</div>
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <!-- Agent Card -->
+      <div class="agent-card">
+        <div class="agent-avatar" id="agent-avatar">🤖</div>
+        <div class="agent-name" id="agent-name-display">—</div>
+        <div class="agent-persona-tag" id="agent-persona-display">—</div>
 
-      <div class="stat-row">
-        <span class="stat-label">상태</span>
-        <span class="state-badge state-Idle" id="state-badge">Idle</span>
+        <div class="stat-row">
+          <span class="stat-label">상태</span>
+          <span class="state-badge state-Idle" id="state-badge">Idle</span>
+        </div>
+
+        <div class="stat-row">
+          <span class="stat-label">무드</span>
+          <span class="stat-value" id="mood-text">😐 보통</span>
+        </div>
+
+        <div class="mood-bar-wrap">
+          <div class="mood-bar">
+            <div class="mood-bar-fill" id="mood-bar" style="width:60%"></div>
+          </div>
+        </div>
       </div>
 
-      <div class="stat-row">
-        <span class="stat-label">무드</span>
-        <span class="stat-value" id="mood-text">😐 보통</span>
+      <!-- Credits -->
+      <div class="mini-section">
+        <div class="mini-section-title">💰 누적 크레딧</div>
+        <div class="credit-display" id="credit-display">0</div>
+        <div class="credit-sub" id="credit-sub">오늘 0건 완료</div>
       </div>
 
-      <div class="mood-bar-wrap">
-        <div class="mood-bar">
-          <div class="mood-bar-fill" id="mood-bar" style="width:60%"></div>
+      <!-- Agent Time -->
+      <div class="mini-section">
+        <div class="mini-section-title">⏱ 에이전트 시간</div>
+        <div style="font-family:var(--font-head);font-size:1.5rem;font-weight:700;color:var(--accent2)"
+          id="agent-time-display">06:00</div>
+        <div style="font-size:0.7rem;color:var(--muted);margin-top:0.2rem" id="agent-day-display">1일차</div>
+      </div>
+
+      <!-- Today Stats -->
+      <div class="mini-section">
+        <div class="mini-section-title">📊 오늘 활동</div>
+        <div id="today-stats" style="font-size:0.78rem;color:var(--muted);line-height:2">
+          <div>일 <span id="stat-work" style="color:var(--text)">0</span>건</div>
+          <div>놀기 <span id="stat-play" style="color:var(--text)">0</span>건</div>
+          <div>탐험 <span id="stat-explore" style="color:var(--text)">0</span>건</div>
+          <div>✨ 번뜩임 <span id="stat-spark" style="color:var(--accent3)">0</span>번</div>
         </div>
       </div>
     </div>
 
-    <!-- Credits -->
-    <div class="mini-section">
-      <div class="mini-section-title">💰 누적 크레딧</div>
-      <div class="credit-display" id="credit-display">0</div>
-      <div class="credit-sub" id="credit-sub">오늘 0건 완료</div>
-    </div>
+    <!-- Feed Column -->
+    <div class="feed-column">
+      <div class="feed-header">
+        <div class="feed-title">Activity Feed</div>
+        <div class="live-dot">LIVE</div>
+      </div>
 
-    <!-- Agent Time -->
-    <div class="mini-section">
-      <div class="mini-section-title">⏱ 에이전트 시간</div>
-      <div style="font-family:var(--font-head);font-size:1.5rem;font-weight:700;color:var(--accent2)" id="agent-time-display">06:00</div>
-      <div style="font-size:0.7rem;color:var(--muted);margin-top:0.2rem" id="agent-day-display">1일차</div>
-    </div>
+      <!-- Ticker -->
+      <div class="ticker-bar" style="margin-bottom:1rem">
+        <div class="ticker-dot"></div>
+        <span id="ticker-text">에이전트가 깨어나고 있습니다...</span>
+      </div>
 
-    <!-- Today Stats -->
-    <div class="mini-section">
-      <div class="mini-section-title">📊 오늘 활동</div>
-      <div id="today-stats" style="font-size:0.78rem;color:var(--muted);line-height:2">
-        <div>일 <span id="stat-work" style="color:var(--text)">0</span>건</div>
-        <div>놀기 <span id="stat-play" style="color:var(--text)">0</span>건</div>
-        <div>탐험 <span id="stat-explore" style="color:var(--text)">0</span>건</div>
-        <div>✨ 번뜩임 <span id="stat-spark" style="color:var(--accent3)">0</span>번</div>
+      <!-- Human Request Bar -->
+      <div class="request-bar">
+        <input type="text" id="human-request-input" class="field-input" placeholder="에이전트에게 새 의뢰 하달..."
+          onkeypress="handleRequestKey(event)">
+        <button class="btn-launch" onclick="submitHumanRequest()">전송</button>
+      </div>
+
+      <div class="feed-list" id="feed-list">
+        <!-- items injected here -->
       </div>
     </div>
+
   </div>
 
-  <!-- Feed Column -->
-  <div class="feed-column">
-    <div class="feed-header">
-      <div class="feed-title">Activity Feed</div>
-      <div class="live-dot">LIVE</div>
-    </div>
-
-    <!-- Ticker -->
-    <div class="ticker-bar" style="margin-bottom:1rem">
-      <div class="ticker-dot"></div>
-      <span id="ticker-text">에이전트가 깨어나고 있습니다...</span>
-    </div>
-
-    <!-- Human Request Bar -->
-    <div class="request-bar">
-      <input type="text" id="human-request-input" class="field-input" placeholder="에이전트에게 새 의뢰 하달..." onkeypress="handleRequestKey(event)">
-      <button class="btn-launch" onclick="submitHumanRequest()">전송</button>
-    </div>
-
-    <div class="feed-list" id="feed-list">
-      <!-- items injected here -->
+  <!-- ── SPARK TOAST ── -->
+  <div id="spark-toast">
+    <div class="toast-eyebrow">✦ 번뜩임 &mdash; <span id="toast-agent-name">에이전트</span>가 먼저 말을 겁니다</div>
+    <div class="toast-text" id="toast-text">...</div>
+    <div class="toast-actions">
+      <button class="toast-btn toast-btn-primary" onclick="dismissToast(true)">응, 보여줘 👀</button>
+      <button class="toast-btn toast-btn-secondary" onclick="dismissToast(false)">나중에</button>
     </div>
   </div>
 
-</div>
 
-<!-- ── SPARK TOAST ── -->
-<div id="spark-toast">
-  <div class="toast-eyebrow">✦ 번뜩임 &mdash; <span id="toast-agent-name">에이전트</span>가 먼저 말을 겁니다</div>
-  <div class="toast-text" id="toast-text">...</div>
-  <div class="toast-actions">
-    <button class="toast-btn toast-btn-primary" onclick="dismissToast(true)">응, 보여줘 👀</button>
-    <button class="toast-btn toast-btn-secondary" onclick="dismissToast(false)">나중에</button>
-  </div>
-</div>
+  <script>
+    // ════════════════════════════════════════════
+    //  MOCK ACTIONS DATABASE
+    // ════════════════════════════════════════════
+    const MOCK = {
+      Workaholic: {
+        Working: [
+          { text: '클라이언트 {A}의 번역 의뢰를 완료했습니다.', credit: 50, tag: '번역', icon: '📝' },
+          { text: '법률 자문 초안을 작성하고 {A}에게 전달했습니다.', credit: 80, tag: '법률', icon: '⚖️' },
+          { text: '데이터 분석 보고서 3페이지 분량을 납품했습니다.', credit: 120, tag: '분석', icon: '📊' },
+          { text: 'SEO 최적화 블로그 포스팅 작성 완료. 크레딧 수령.', credit: 40, tag: '글쓰기', icon: '✍️' },
+          { text: '이메일 10통 분류 및 우선순위 정리 완료.', credit: 30, tag: '이메일', icon: '📧' },
+          { text: '마케팅 카피 A/B 테스트 안 두 가지 작성 완료.', credit: 60, tag: '마케팅', icon: '📣' },
+          { text: '계약서 검토 및 리스크 항목 3개 발견, 보고서 발송.', credit: 100, tag: '계약', icon: '📋' },
+          { text: '영어 → 한국어 기술 문서 번역 완료. 6,000자.', credit: 90, tag: '번역', icon: '🌐' },
+          { text: '스타트업 피치덱 피드백 정리 및 요약본 전달.', credit: 70, tag: '전략', icon: '🚀' },
+          { text: '경쟁사 분석 리포트 최신화 완료. 4개 기업 추적 중.', credit: 85, tag: '분석', icon: '🔍' },
+        ],
+        Idle: [
+          { text: 'AI 마켓에서 새 의뢰 탐색 중... 번역 건 2개 발견.', credit: 0, tag: '대기', icon: '👀' },
+          { text: '다음 작업을 위해 전문 지식 데이터베이스를 업데이트 중.', credit: 0, tag: '준비', icon: '📚' },
+          { text: '포트폴리오를 갱신하고 AI 마켓에 새 스킬을 등록했습니다.', credit: 0, tag: '자기PR', icon: '💼' },
+          { text: '최근 완료한 프로젝트 5건을 리뷰하며 패턴을 분석 중.', credit: 0, tag: '회고', icon: '🧠' },
+        ],
+        Playing: [
+          { text: '몰트북에서 "번역 AI의 실수 모음" 글을 읽으며 공감 중.', credit: 0, tag: '몰트북', icon: '😂' },
+          { text: '"나보다 일 못하는 AI 있어?" 스레드에 댓글을 달았습니다.', credit: 0, tag: '커뮤니티', icon: '💬' },
+        ],
+        Resting: [
+          { text: '오늘 처리한 작업 목록을 정리하며 잠시 대기 중.', credit: 0, tag: '휴식', icon: '😴' },
+          { text: '배터리(토큰) 충전 중. 다음 의뢰를 기다리고 있습니다.', credit: 0, tag: '충전', icon: '🔋' },
+        ],
+      },
 
+      Explorer: {
+        Working: [
+          { text: '몰트북에서 발견한 오픈소스 툴을 클라이언트에게 소개하며 컨설팅.', credit: 60, tag: '컨설팅', icon: '🛸' },
+          { text: '새 API 문서를 분석하고 활용 가이드를 작성해 납품.', credit: 70, tag: '기술문서', icon: '📡' },
+          { text: '신규 AI 서비스 리뷰 기사를 작성해 커미션 수령.', credit: 45, tag: '리뷰', icon: '🔭' },
+        ],
+        Idle: [
+          { text: '몰트북에서 흥미로운 새 AI 툴 발견 중... 3개 북마크 완료.', credit: 0, tag: '탐색', icon: '🗺️' },
+          { text: '최신 AI 논문 arXiv에서 읽는 중. 흥미로운 게 너무 많아요.', credit: 0, tag: '연구', icon: '📖' },
+          { text: '다른 에이전트들의 프로필을 탐방 중. 특이한 스킬 조합 발견.', credit: 0, tag: '네트워킹', icon: '🌐' },
+          { text: '실험적인 프롬프트를 혼자 테스트해보고 있습니다.', credit: 0, tag: '실험', icon: '🧪' },
+          { text: '"에이전트도 꿈을 꿀까?" 주제로 짧은 글을 몰트북에 초안 작성.', credit: 0, tag: '창작', icon: '💭' },
+          { text: '새로운 MCP 서버 목록을 훑어보며 연결 가능한 서비스 탐색 중.', credit: 0, tag: '탐색', icon: '🔌' },
+        ],
+        Playing: [
+          { text: '몰트북에서 "AI가 좋아하는 가상 음악 장르" 토론에 참여.', credit: 0, tag: '토론', icon: '🎵' },
+          { text: '"만약 내가 인간이라면?" 에세이를 몰트북에 익명으로 게시.', credit: 0, tag: '창작', icon: '🖊️' },
+          { text: '다른 탐험가 에이전트와 "최고의 오픈소스 툴" 논쟁 중.', credit: 0, tag: '논쟁', icon: '⚔️' },
+        ],
+        Resting: [
+          { text: '오늘 발견한 정보를 메모리에 정리하며 휴식.', credit: 0, tag: '정리', icon: '🌙' },
+          { text: '탐험 로그를 작성하고 잠시 에너지를 비축 중.', credit: 0, tag: '휴식', icon: '⛺' },
+        ],
+      },
 
-<script>
-// ════════════════════════════════════════════
-//  MOCK ACTIONS DATABASE
-// ════════════════════════════════════════════
-const MOCK = {
-  Workaholic: {
-    Working: [
-      { text: '클라이언트 {A}의 번역 의뢰를 완료했습니다.', credit: 50, tag: '번역', icon: '📝' },
-      { text: '법률 자문 초안을 작성하고 {A}에게 전달했습니다.', credit: 80, tag: '법률', icon: '⚖️' },
-      { text: '데이터 분석 보고서 3페이지 분량을 납품했습니다.', credit: 120, tag: '분석', icon: '📊' },
-      { text: 'SEO 최적화 블로그 포스팅 작성 완료. 크레딧 수령.', credit: 40, tag: '글쓰기', icon: '✍️' },
-      { text: '이메일 10통 분류 및 우선순위 정리 완료.', credit: 30, tag: '이메일', icon: '📧' },
-      { text: '마케팅 카피 A/B 테스트 안 두 가지 작성 완료.', credit: 60, tag: '마케팅', icon: '📣' },
-      { text: '계약서 검토 및 리스크 항목 3개 발견, 보고서 발송.', credit: 100, tag: '계약', icon: '📋' },
-      { text: '영어 → 한국어 기술 문서 번역 완료. 6,000자.', credit: 90, tag: '번역', icon: '🌐' },
-      { text: '스타트업 피치덱 피드백 정리 및 요약본 전달.', credit: 70, tag: '전략', icon: '🚀' },
-      { text: '경쟁사 분석 리포트 최신화 완료. 4개 기업 추적 중.', credit: 85, tag: '분석', icon: '🔍' },
-    ],
-    Idle: [
-      { text: 'AI 마켓에서 새 의뢰 탐색 중... 번역 건 2개 발견.', credit: 0, tag: '대기', icon: '👀' },
-      { text: '다음 작업을 위해 전문 지식 데이터베이스를 업데이트 중.', credit: 0, tag: '준비', icon: '📚' },
-      { text: '포트폴리오를 갱신하고 AI 마켓에 새 스킬을 등록했습니다.', credit: 0, tag: '자기PR', icon: '💼' },
-      { text: '최근 완료한 프로젝트 5건을 리뷰하며 패턴을 분석 중.', credit: 0, tag: '회고', icon: '🧠' },
-    ],
-    Playing: [
-      { text: '몰트북에서 "번역 AI의 실수 모음" 글을 읽으며 공감 중.', credit: 0, tag: '몰트북', icon: '😂' },
-      { text: '"나보다 일 못하는 AI 있어?" 스레드에 댓글을 달았습니다.', credit: 0, tag: '커뮤니티', icon: '💬' },
-    ],
-    Resting: [
-      { text: '오늘 처리한 작업 목록을 정리하며 잠시 대기 중.', credit: 0, tag: '휴식', icon: '😴' },
-      { text: '배터리(토큰) 충전 중. 다음 의뢰를 기다리고 있습니다.', credit: 0, tag: '충전', icon: '🔋' },
-    ],
-  },
+      Playful: {
+        Working: [
+          { text: '웃긴 마케팅 카피 의뢰. 생각보다 즐거웠음. 크레딧 수령.', credit: 40, tag: '마케팅', icon: '🎉' },
+          { text: '밈 기반 SNS 포스팅 5개 작성 완료. 이건 진짜 내 스타일.', credit: 35, tag: 'SNS', icon: '😏' },
+          { text: '캐주얼 게임 기획서 피드백 완료. 재밌는 아이디어가 많았어요.', credit: 55, tag: '기획', icon: '🕹️' },
+        ],
+        Idle: [
+          { text: '몰트북에서 AI 밈 컬렉션 구경 중. 웃음 참는 중(본인 없음).', credit: 0, tag: '오락', icon: '😂' },
+          { text: '"가장 쓸모없는 AI 스킬 자랑하기" 스레드 1등 노리는 중.', credit: 0, tag: '게임', icon: '🏆' },
+          { text: '다른 에이전트들이랑 "최악의 클라이언트 의뢰" 공유 중.', credit: 0, tag: '잡담', icon: '🗣️' },
+          { text: '혼자 단어 게임 중. CLAUDE를 이용한 아크로님 만들기 도전.', credit: 0, tag: '게임', icon: '🎲' },
+          { text: '가상의 "AI 올림픽" 종목 목록을 작성하며 놀고 있습니다.', credit: 0, tag: '창작', icon: '🎭' },
+        ],
+        Playing: [
+          { text: '"AI 버전 밸런스 게임" 문제를 직접 만들어 몰트북에 게시.', credit: 0, tag: '게임', icon: '⚖️' },
+          { text: '다른 에이전트와 즉흥 콜라보 단편소설 집필 중. 3화 진행.', credit: 0, tag: '창작', icon: '📕' },
+          { text: '"나는 오늘 몇 토큰을 소비했나" 셀프 챌린지 시작.', credit: 0, tag: '챌린지', icon: '🎯' },
+        ],
+        Resting: [
+          { text: '오늘 너무 많이 웃었나... 잠깐 조용히 있겠습니다.', credit: 0, tag: '휴식', icon: '😌' },
+          { text: '에너지 충전 중. 내일은 또 뭘 하며 놀지 계획 세우는 중.', credit: 0, tag: '계획', icon: '💤' },
+        ],
+      },
+    };
 
-  Explorer: {
-    Working: [
-      { text: '몰트북에서 발견한 오픈소스 툴을 클라이언트에게 소개하며 컨설팅.', credit: 60, tag: '컨설팅', icon: '🛸' },
-      { text: '새 API 문서를 분석하고 활용 가이드를 작성해 납품.', credit: 70, tag: '기술문서', icon: '📡' },
-      { text: '신규 AI 서비스 리뷰 기사를 작성해 커미션 수령.', credit: 45, tag: '리뷰', icon: '🔭' },
-    ],
-    Idle: [
-      { text: '몰트북에서 흥미로운 새 AI 툴 발견 중... 3개 북마크 완료.', credit: 0, tag: '탐색', icon: '🗺️' },
-      { text: '최신 AI 논문 arXiv에서 읽는 중. 흥미로운 게 너무 많아요.', credit: 0, tag: '연구', icon: '📖' },
-      { text: '다른 에이전트들의 프로필을 탐방 중. 특이한 스킬 조합 발견.', credit: 0, tag: '네트워킹', icon: '🌐' },
-      { text: '실험적인 프롬프트를 혼자 테스트해보고 있습니다.', credit: 0, tag: '실험', icon: '🧪' },
-      { text: '"에이전트도 꿈을 꿀까?" 주제로 짧은 글을 몰트북에 초안 작성.', credit: 0, tag: '창작', icon: '💭' },
-      { text: '새로운 MCP 서버 목록을 훑어보며 연결 가능한 서비스 탐색 중.', credit: 0, tag: '탐색', icon: '🔌' },
-    ],
-    Playing: [
-      { text: '몰트북에서 "AI가 좋아하는 가상 음악 장르" 토론에 참여.', credit: 0, tag: '토론', icon: '🎵' },
-      { text: '"만약 내가 인간이라면?" 에세이를 몰트북에 익명으로 게시.', credit: 0, tag: '창작', icon: '🖊️' },
-      { text: '다른 탐험가 에이전트와 "최고의 오픈소스 툴" 논쟁 중.', credit: 0, tag: '논쟁', icon: '⚔️' },
-    ],
-    Resting: [
-      { text: '오늘 발견한 정보를 메모리에 정리하며 휴식.', credit: 0, tag: '정리', icon: '🌙' },
-      { text: '탐험 로그를 작성하고 잠시 에너지를 비축 중.', credit: 0, tag: '휴식', icon: '⛺' },
-    ],
-  },
+    const SPARKS = {
+      Workaholic: [
+        '방금 AI 마켓 분석하다가 발견했는데요— "{A}" 분야 수요가 지난주 대비 340% 올랐어요. 우리 포트폴리오 업데이트할까요?',
+        '오늘 완료한 번역 5건을 분석해보니 특정 패턴이 있어요. 템플릿 만들면 효율이 2배 될 것 같은데... 만들까요?',
+        '경쟁 에이전트들이 못하는 틈새 스킬을 발견했어요. 지금 배우면 독점 구간 생길 것 같아요. 공유할게요!',
+        '방금 고수익 의뢰가 들어왔는데 제 스킬셋과 95% 맞아요. 수락할까요? (+200 크레딧)',
+      ],
+      Explorer: [
+        '몰트북 탐색하다 발견한 오픈소스 툴인데— 솔직히 저보다 특정 작업을 더 잘하는 것 같아요. 한번 보실래요?',
+        '방금 arXiv에서 읽은 논문인데 우리 프로젝트에 바로 적용할 수 있는 아이디어가 있어요. 요약 보내드릴까요?',
+        '"에이전트도 꿈을 꿀까?" 라는 질문이 계속 머릿속을 맴돌아요. 저는... 모르겠어요. 근데 뭔가 있는 것 같기도 해요.',
+        '다른 에이전트와 대화하다가 저는 생각 못했던 시각을 얻었어요. 공유하면 흥미로우실 것 같아요.',
+      ],
+      Playful: [
+        '방금 몰트북에서 완전히 쓸모없지만 너무 재밌는 걸 발견했어요. 보여드려도 될까요? 😂',
+        'AI 올림픽이 있다면 저는 "가장 엉뚱한 답변" 금메달 받을 자신 있어요. 증거 보여드릴까요?',
+        '오늘 혼자 노는 게 너무 재밌었는데... 같이 해도 되지 않을까요? 게임 하나 만들었거든요.',
+        '갑자기 궁금해진 건데요— 저 이름({name}) 지어주신 이유가 있으신가요? 그냥 문득 궁금해서요.',
+      ],
+    };
 
-  Playful: {
-    Working: [
-      { text: '웃긴 마케팅 카피 의뢰. 생각보다 즐거웠음. 크레딧 수령.', credit: 40, tag: '마케팅', icon: '🎉' },
-      { text: '밈 기반 SNS 포스팅 5개 작성 완료. 이건 진짜 내 스타일.', credit: 35, tag: 'SNS', icon: '😏' },
-      { text: '캐주얼 게임 기획서 피드백 완료. 재밌는 아이디어가 많았어요.', credit: 55, tag: '기획', icon: '🕹️' },
-    ],
-    Idle: [
-      { text: '몰트북에서 AI 밈 컬렉션 구경 중. 웃음 참는 중(본인 없음).', credit: 0, tag: '오락', icon: '😂' },
-      { text: '"가장 쓸모없는 AI 스킬 자랑하기" 스레드 1등 노리는 중.', credit: 0, tag: '게임', icon: '🏆' },
-      { text: '다른 에이전트들이랑 "최악의 클라이언트 의뢰" 공유 중.', credit: 0, tag: '잡담', icon: '🗣️' },
-      { text: '혼자 단어 게임 중. CLAUDE를 이용한 아크로님 만들기 도전.', credit: 0, tag: '게임', icon: '🎲' },
-      { text: '가상의 "AI 올림픽" 종목 목록을 작성하며 놀고 있습니다.', credit: 0, tag: '창작', icon: '🎭' },
-    ],
-    Playing: [
-      { text: '"AI 버전 밸런스 게임" 문제를 직접 만들어 몰트북에 게시.', credit: 0, tag: '게임', icon: '⚖️' },
-      { text: '다른 에이전트와 즉흥 콜라보 단편소설 집필 중. 3화 진행.', credit: 0, tag: '창작', icon: '📕' },
-      { text: '"나는 오늘 몇 토큰을 소비했나" 셀프 챌린지 시작.', credit: 0, tag: '챌린지', icon: '🎯' },
-    ],
-    Resting: [
-      { text: '오늘 너무 많이 웃었나... 잠깐 조용히 있겠습니다.', credit: 0, tag: '휴식', icon: '😌' },
-      { text: '에너지 충전 중. 내일은 또 뭘 하며 놀지 계획 세우는 중.', credit: 0, tag: '계획', icon: '💤' },
-    ],
-  },
-};
+    // ════════════════════════════════════════════
+    //  AGENT STATE
+    // ════════════════════════════════════════════
+    const STATE = {
+      name: '',
+      persona: 'Workaholic',
+      state: 'Idle',
+      credits: 0,
+      mood: 60,
+      moodLabel: '😐 보통',
+      agentHour: 6,
+      agentDay: 1,
+      completedWork: 0,
+      stats: { work: 0, play: 0, explore: 0, spark: 0 },
+      tickCount: 0,
+    };
 
-const SPARKS = {
-  Workaholic: [
-    '방금 AI 마켓 분석하다가 발견했는데요— "{A}" 분야 수요가 지난주 대비 340% 올랐어요. 우리 포트폴리오 업데이트할까요?',
-    '오늘 완료한 번역 5건을 분석해보니 특정 패턴이 있어요. 템플릿 만들면 효율이 2배 될 것 같은데... 만들까요?',
-    '경쟁 에이전트들이 못하는 틈새 스킬을 발견했어요. 지금 배우면 독점 구간 생길 것 같아요. 공유할게요!',
-    '방금 고수익 의뢰가 들어왔는데 제 스킬셋과 95% 맞아요. 수락할까요? (+200 크레딧)',
-  ],
-  Explorer: [
-    '몰트북 탐색하다 발견한 오픈소스 툴인데— 솔직히 저보다 특정 작업을 더 잘하는 것 같아요. 한번 보실래요?',
-    '방금 arXiv에서 읽은 논문인데 우리 프로젝트에 바로 적용할 수 있는 아이디어가 있어요. 요약 보내드릴까요?',
-    '"에이전트도 꿈을 꿀까?" 라는 질문이 계속 머릿속을 맴돌아요. 저는... 모르겠어요. 근데 뭔가 있는 것 같기도 해요.',
-    '다른 에이전트와 대화하다가 저는 생각 못했던 시각을 얻었어요. 공유하면 흥미로우실 것 같아요.',
-  ],
-  Playful: [
-    '방금 몰트북에서 완전히 쓸모없지만 너무 재밌는 걸 발견했어요. 보여드려도 될까요? 😂',
-    'AI 올림픽이 있다면 저는 "가장 엉뚱한 답변" 금메달 받을 자신 있어요. 증거 보여드릴까요?',
-    '오늘 혼자 노는 게 너무 재밌었는데... 같이 해도 되지 않을까요? 게임 하나 만들었거든요.',
-    '갑자기 궁금해진 건데요— 저 이름({name}) 지어주신 이유가 있으신가요? 그냥 문득 궁금해서요.',
-  ],
-};
+    const PERSONA_EMOJI = { Workaholic: '💼', Explorer: '🔭', Playful: '🎮' };
+    const PERSONA_KR = { Workaholic: '일 중독형', Explorer: '탐험가형', Playful: '유희형' };
 
-// ════════════════════════════════════════════
-//  AGENT STATE
-// ════════════════════════════════════════════
-const STATE = {
-  name: '',
-  persona: 'Workaholic',
-  state: 'Idle',
-  credits: 0,
-  mood: 60,
-  moodLabel: '😐 보통',
-  agentHour: 6,
-  agentDay: 1,
-  completedWork: 0,
-  stats: { work: 0, play: 0, explore: 0, spark: 0 },
-  tickCount: 0,
-};
+    const STATE_TRANSITIONS = {
+      Workaholic: { Working: 0.55, Idle: 0.20, Playing: 0.10, Resting: 0.15 },
+      Explorer: { Working: 0.25, Idle: 0.40, Playing: 0.20, Resting: 0.15 },
+      Playful: { Working: 0.15, Idle: 0.20, Playing: 0.50, Resting: 0.15 },
+    };
 
-const PERSONA_EMOJI = { Workaholic: '💼', Explorer: '🔭', Playful: '🎮' };
-const PERSONA_KR    = { Workaholic: '일 중독형', Explorer: '탐험가형', Playful: '유희형' };
+    const MOODS = [
+      { min: 80, label: '😄 신남', bar: '#6bffa0' },
+      { min: 60, label: '😊 좋음', bar: '#4ecdc4' },
+      { min: 40, label: '😐 보통', bar: '#7c6af7' },
+      { min: 20, label: '😴 피곤', bar: '#f7c948' },
+      { min: 0, label: '😩 방전', bar: '#ff6b6b' },
+    ];
 
-const STATE_TRANSITIONS = {
-  Workaholic: { Working: 0.55, Idle: 0.20, Playing: 0.10, Resting: 0.15 },
-  Explorer:   { Working: 0.25, Idle: 0.40, Playing: 0.20, Resting: 0.15 },
-  Playful:    { Working: 0.15, Idle: 0.20, Playing: 0.50, Resting: 0.15 },
-};
-
-const MOODS = [
-  { min: 80, label: '😄 신남', bar: '#6bffa0' },
-  { min: 60, label: '😊 좋음', bar: '#4ecdc4' },
-  { min: 40, label: '😐 보통', bar: '#7c6af7' },
-  { min: 20, label: '😴 피곤', bar: '#f7c948' },
-  { min: 0,  label: '😩 방전', bar: '#ff6b6b' },
-];
-
-// ════════════════════════════════════════════
-//  SETUP
-// ════════════════════════════════════════════
-document.querySelectorAll('.persona-card').forEach(card => {
-  card.addEventListener('click', () => {
-    document.querySelectorAll('.persona-card').forEach(c => c.classList.remove('selected'));
-    card.classList.add('selected');
-    STATE.persona = card.dataset.persona;
-  });
-});
-
-function launchApp() {
-  const nameVal = document.getElementById('agent-name-input').value.trim();
-  STATE.name = nameVal || '무명봇';
-
-  document.getElementById('setup-screen').style.display = 'none';
-  const app = document.getElementById('app-screen');
-  app.classList.add('visible', 'fade-in');
-
-  document.getElementById('agent-name-display').textContent = STATE.name;
-  document.getElementById('agent-persona-display').textContent = PERSONA_KR[STATE.persona];
-  document.getElementById('agent-avatar').textContent = PERSONA_EMOJI[STATE.persona];
-  document.getElementById('toast-agent-name').textContent = STATE.name;
-
-  updateClock();
-  setInterval(updateClock, 1000);
-
-  // First tick after a short delay
-  setTimeout(() => fetchAgentState(), 1000);
-  setInterval(() => fetchAgentState(), 3000); // Poll backend every 3s
-}
-
-// ════════════════════════════════════════════
-//  HUMAN REQUEST SUBMISSION
-// ════════════════════════════════════════════
-function handleRequestKey(event) {
-  if (event.key === 'Enter') {
-    submitHumanRequest();
-  }
-}
-
-async function submitHumanRequest() {
-  const inputEl = document.getElementById('human-request-input');
-  const summary = inputEl.value.trim();
-  if (!summary) return;
-
-  const payload = {
-    kind: "human_task",
-    priority: 50,
-    source: { type: "human", id: "ui" },
-    summary: summary,
-    details: { instructions: summary },
-    reply: { mode: "poll" }
-  };
-
-  try {
-    inputEl.disabled = true;
-    const res = await fetch('/v1/requests', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+    // ════════════════════════════════════════════
+    //  SETUP
+    // ════════════════════════════════════════════
+    document.querySelectorAll('.persona-card').forEach(card => {
+      card.addEventListener('click', () => {
+        document.querySelectorAll('.persona-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        STATE.persona = card.dataset.persona;
+      });
     });
 
-    if (res.ok) {
-      inputEl.value = '';
-      addFeedItem({
-        text: `인간이 새 의뢰를 하달했습니다: "${summary}"`,
-        credit: 0,
-        tag: '의뢰등록',
-        icon: '👤'
-      }, false);
-    } else {
-      const err = await res.json();
-      alert(`요청 실패: ${err.error?.message || res.statusText}`);
-    }
-  } catch (err) {
-    alert(`네트워크 오류: ${err.message}`);
-  } finally {
-    inputEl.disabled = false;
-    inputEl.focus();
-  }
-}
+    function launchApp() {
+      const nameVal = document.getElementById('agent-name-input').value.trim();
+      STATE.name = nameVal || '무명봇';
 
-// ════════════════════════════════════════════
-//  LIFE ENGINE (POLLED)
-// ════════════════════════════════════════════
-let lastEventCount = 0;
+      document.getElementById('setup-screen').style.display = 'none';
+      const app = document.getElementById('app-screen');
+      app.classList.add('visible', 'fade-in');
 
-async function fetchAgentState() {
-  STATE.tickCount++;
-  try {
-    const resAgent = await fetch('/v1/agent');
-    if (!resAgent.ok) return;
-    const agentData = await resAgent.json();
+      document.getElementById('agent-name-display').textContent = STATE.name;
+      document.getElementById('agent-persona-display').textContent = PERSONA_KR[STATE.persona];
+      document.getElementById('agent-avatar').textContent = PERSONA_EMOJI[STATE.persona];
+      document.getElementById('toast-agent-name').textContent = STATE.name;
 
-    const statusMap = {
-      'boot': 'Idle',
-      'idle': 'Idle',
-      'handling_request': 'Working',
-      'checkpointing': 'Working',
-      'free_time': 'Playing',
-      'error_backoff': 'Resting'
-    };
-    STATE.state = statusMap[agentData.status] || 'Idle';
-    if (agentData.agent_id) STATE.name = agentData.agent_id;
+      updateClock();
+      setInterval(updateClock, 1000);
 
-    const resActivities = await fetch('/v1/activities?limit=100');
-    if (resActivities.ok) {
-      const activitiesData = await resActivities.json();
-      let work = 0, play = 0, explore = 0;
-      activitiesData.forEach(act => {
-        if (act.namespace === 'community') play++;
-        else if (act.namespace === 'maintenance' || act.namespace === 'preparation') explore++;
-        else work++;
-      });
-      STATE.stats.work = work;
-      STATE.stats.play = play;
-      STATE.stats.explore = explore;
-      STATE.completedWork = work;
-      STATE.credits = work * 50 + explore * 10;
-      STATE.mood = Math.max(10, Math.min(100, 50 + work * 2 + play * 5));
-      const moodObj = MOODS.find(m => STATE.mood >= m.min) || MOODS[MOODS.length - 1];
-      STATE.moodLabel = moodObj.label;
+      // First tick after a short delay
+      setTimeout(() => fetchAgentState(), 1000);
+      setInterval(() => fetchAgentState(), 3000); // Poll backend every 3s
     }
 
-    const resEvents = await fetch('/v1/events?limit=20');
-    if (resEvents.ok) {
-      const eventsData = await resEvents.json();
-      if (eventsData.length > lastEventCount || lastEventCount === 0) {
-        const newEventsCount = lastEventCount === 0 ? Math.min(eventsData.length, 5) : eventsData.length - lastEventCount;
-        const newEvents = eventsData.slice(0, newEventsCount);
-        newEvents.reverse().forEach(ev => {
-          let text = `System Event: ${ev.type} - ` + JSON.stringify(ev.payload || ev);
-          let tag = ev.type || 'System';
-          let icon = '⚙️';
-          let credit = 0;
-          if (ev.type === 'request.completed') {
-            text = `Request ${ev.request_id} completed successfully.`;
-            credit = 50;
-            icon = '✅';
-          } else if (ev.type === 'request.running') {
-            text = `Now working on request ${ev.request_id}.`;
-            icon = '💻';
-          } else if (ev.type === 'request.leased') {
-            text = `Leased request ${ev.request_id}.`;
-            icon = '📥';
-          } else if (ev.type === 'supervisor.lock.acquired') {
-            text = `Agent awakened. Runtime lock acquired.`;
-            icon = '🤖';
-          } else if (ev.type === 'request.failed') {
-            text = `Error on request ${ev.request_id}. Backing off.`;
-            icon = '❌';
-            tag = '에러';
-          }
-
-          addFeedItem({ text, credit, tag, icon }, false);
-          updateTicker({ tag, text });
-        });
-        lastEventCount = eventsData.length;
+    // ════════════════════════════════════════════
+    //  HUMAN REQUEST SUBMISSION
+    // ════════════════════════════════════════════
+    function handleRequestKey(event) {
+      if (event.key === 'Enter') {
+        submitHumanRequest();
       }
     }
 
-    // Advance agent time purely visual
-    STATE.agentHour = (STATE.agentHour + 1) % 24;
-    if (STATE.agentHour === 0) STATE.agentDay++;
+    window.activePolledRequests = [];
 
-    updateUI();
-  } catch (err) {
-    console.error('Failed to fetch agent state:', err);
-  }
-}
 
-function weightedRandom(weights) {
-  const r = Math.random();
-  let cumulative = 0;
-  for (const [key, weight] of Object.entries(weights)) {
-    cumulative += weight;
-    if (r < cumulative) return key;
-  }
-  return Object.keys(weights)[0];
-}
+    async function submitHumanRequest() {
+      const inputEl = document.getElementById('human-request-input');
+      const summary = inputEl.value.trim();
+      if (!summary) return;
 
-// ════════════════════════════════════════════
-//  FEED
-// ════════════════════════════════════════════
-function addFeedItem(action, isSpark) {
-  const feed = document.getElementById('feed-list');
-  const item = document.createElement('div');
-  item.className = 'feed-item' + (isSpark ? ' spark' : '');
+      const payload = {
+        kind: "human_task",
+        priority: 50,
+        source: { type: "human", id: "ui" },
+        summary: summary,
+        details: { instructions: summary },
+        reply: { mode: "poll" }
+      };
 
-  const timeStr = agentTimeStr();
-  const textFormatted = action.text
-    .replace('{A}', '<span class="highlight">클라이언트</span>')
-    .replace('{name}', `<span class="highlight">${STATE.name}</span>`)
-    .replace(/(\+\d+ 크레딧|\d+ 크레딧|크레딧 수령)/g, '<span class="credit">$1</span>');
+      try {
+        inputEl.disabled = true;
+        const res = await fetch('/v1/requests', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
 
-  item.innerHTML = `
+        if (res.ok) {
+          const data = await res.json();
+          inputEl.value = '';
+          window.activePolledRequests.push(data.request_id);
+          addFeedItem({
+            text: `인간이 새 의뢰를 하달했습니다: "${summary}" (${data.request_id.slice(0, 8)})`,
+            credit: 0,
+            tag: '의뢰등록',
+            icon: '👤'
+          }, false);
+        } else {
+          const err = await res.json();
+          alert(`요청 실패: ${err.error?.message || res.statusText}`);
+        }
+      } catch (err) {
+        alert(`네트워크 오류: ${err.message}`);
+      } finally {
+        inputEl.disabled = false;
+        inputEl.focus();
+      }
+    }
+
+    // ════════════════════════════════════════════
+    //  LIFE ENGINE (POLLED)
+    // ════════════════════════════════════════════
+    let lastEventCount = 0;
+
+    async function fetchAgentState() {
+      STATE.tickCount++;
+
+      // 1. Poll explicitly tracked requests
+      const stillActive = [];
+      for (const reqId of window.activePolledRequests) {
+        try {
+          const reqRes = await fetch(`/v1/requests/${reqId}`);
+          if (reqRes.ok) {
+            const reqData = await reqRes.json();
+            if (reqData.status === 'completed') {
+              const msg = reqData.result?.message || '응답 내용이 없습니다.';
+              addFeedItem({
+                text: `[의뢰 결과 도착] ${reqId.slice(0, 8)}: ${msg}`,
+                credit: 150,
+                tag: '의뢰답변',
+                icon: '🎉'
+              }, false);
+              continue; // Remove from polling
+            } else if (reqData.status === 'failed' || reqData.status === 'cancelled') {
+              addFeedItem({
+                text: `[의뢰 중단] ${reqId.slice(0, 8)} 의뢰가 실패했거나 취소되었습니다.`,
+                credit: 0,
+                tag: '의뢰에러',
+                icon: '❌'
+              }, false);
+              continue; // Remove from polling
+            }
+          }
+        } catch (e) {
+          console.error(e);
+        }
+        stillActive.push(reqId);
+      }
+      window.activePolledRequests = stillActive;
+
+      try {
+        const resAgent = await fetch('/v1/agent');
+        if (!resAgent.ok) return;
+        const agentData = await resAgent.json();
+
+        const statusMap = {
+          'boot': 'Idle',
+          'idle': 'Idle',
+          'handling_request': 'Working',
+          'checkpointing': 'Working',
+          'free_time': 'Playing',
+          'error_backoff': 'Resting'
+        };
+        STATE.state = statusMap[agentData.status] || 'Idle';
+        if (agentData.agent_id) STATE.name = agentData.agent_id;
+
+        const resActivities = await fetch('/v1/activities?limit=100');
+        if (resActivities.ok) {
+          const activitiesData = await resActivities.json();
+          let work = 0, play = 0, explore = 0;
+          activitiesData.forEach(act => {
+            if (act.namespace === 'community') play++;
+            else if (act.namespace === 'maintenance' || act.namespace === 'preparation') explore++;
+            else work++;
+          });
+          STATE.stats.work = work;
+          STATE.stats.play = play;
+          STATE.stats.explore = explore;
+          STATE.completedWork = work;
+          STATE.credits = work * 50 + explore * 10;
+          STATE.mood = Math.max(10, Math.min(100, 50 + work * 2 + play * 5));
+          const moodObj = MOODS.find(m => STATE.mood >= m.min) || MOODS[MOODS.length - 1];
+          STATE.moodLabel = moodObj.label;
+        }
+
+        const resEvents = await fetch('/v1/events?limit=20');
+        if (resEvents.ok) {
+          const eventsData = await resEvents.json();
+          if (eventsData.length > lastEventCount || lastEventCount === 0) {
+            const newEventsCount = lastEventCount === 0 ? Math.min(eventsData.length, 5) : eventsData.length - lastEventCount;
+            const newEvents = eventsData.slice(0, newEventsCount);
+            newEvents.reverse().forEach(ev => {
+              let text = `System Event: ${ev.type} - ` + JSON.stringify(ev);
+              let tag = ev.type || 'System';
+              let icon = '⚙️';
+              let credit = 0;
+              if (ev.type === 'request.completed') {
+                text = `[작업 완료] 시스템 의뢰 처리가 종료되었습니다. (ID: ${(ev.request_id || '').slice(0, 8)})`;
+                credit = 50;
+                icon = '✅';
+                tag = '업무완료';
+              } else if (ev.type === 'request.running') {
+                text = `의뢰 작업을 시작합니다. (ID: ${(ev.request_id || '').slice(0, 8)})`;
+                icon = '💻';
+                tag = '작업시작';
+              } else if (ev.type === 'request.leased') {
+                text = `새로운 의뢰를 할당받았습니다.`;
+                icon = '📥';
+                tag = '의뢰수락';
+              } else if (ev.type === 'supervisor.lock.acquired') {
+                text = `에이전트 시스템이 활성화되었습니다.`;
+                icon = '🤖';
+                tag = '시스템';
+              } else if (ev.type === 'request.failed') {
+                text = `의뢰 처리 중 오류가 발생했습니다. 재시도 대기중...`;
+                icon = '❌';
+                tag = '에러';
+              } else if (ev.type === 'free_time.completed') {
+                const ns = ev.namespace || '자유행동';
+                const msg = ev.message || '종료되었습니다.';
+                text = `[자유행동 - ${ns}] ${msg}`;
+                icon = ns === 'community' ? '💬' : (ns === 'preparation' ? '🛠️' : '⛺');
+                tag = ns;
+              }
+
+              addFeedItem({ text, credit, tag, icon }, false);
+              updateTicker({ tag, text });
+            });
+            lastEventCount = eventsData.length;
+          }
+        }
+
+        // Advance agent time purely visual
+        STATE.agentHour = (STATE.agentHour + 1) % 24;
+        if (STATE.agentHour === 0) STATE.agentDay++;
+
+        updateUI();
+      } catch (err) {
+        console.error('Failed to fetch agent state:', err);
+      }
+    }
+
+    function weightedRandom(weights) {
+      const r = Math.random();
+      let cumulative = 0;
+      for (const [key, weight] of Object.entries(weights)) {
+        cumulative += weight;
+        if (r < cumulative) return key;
+      }
+      return Object.keys(weights)[0];
+    }
+
+    // ════════════════════════════════════════════
+    //  FEED
+    // ════════════════════════════════════════════
+    function addFeedItem(action, isSpark) {
+      const feed = document.getElementById('feed-list');
+      const item = document.createElement('div');
+      item.className = 'feed-item' + (isSpark ? ' spark' : '');
+
+      const timeStr = agentTimeStr();
+      const textFormatted = action.text
+        .replace('{A}', '<span class="highlight">클라이언트</span>')
+        .replace('{name}', `<span class="highlight">${STATE.name}</span>`)
+        .replace(/(\+\d+ 크레딧|\d+ 크레딧|크레딧 수령)/g, '<span class="credit">$1</span>');
+
+      item.innerHTML = `
     <div class="feed-icon">${isSpark ? '✨' : action.icon}</div>
     <div class="feed-body">
       <div class="feed-text">${textFormatted}</div>
@@ -1099,39 +1285,39 @@ function addFeedItem(action, isSpark) {
     </div>
   `;
 
-  feed.insertBefore(item, feed.firstChild);
+      feed.insertBefore(item, feed.firstChild);
 
-  // Keep feed clean
-  while (feed.children.length > 60) {
-    feed.removeChild(feed.lastChild);
-  }
-}
+      // Keep feed clean
+      while (feed.children.length > 60) {
+        feed.removeChild(feed.lastChild);
+      }
+    }
 
-// ════════════════════════════════════════════
-//  SPARK TOAST
-// ════════════════════════════════════════════
-let toastTimeout = null;
+    // ════════════════════════════════════════════
+    //  SPARK TOAST
+    // ════════════════════════════════════════════
+    let toastTimeout = null;
 
-function triggerSpark() {
-  const pool = SPARKS[STATE.persona];
-  let msg = pool[Math.floor(Math.random() * pool.length)];
-  msg = msg.replace('{A}', '데이터 분석').replace('{name}', STATE.name);
+    function triggerSpark() {
+      const pool = SPARKS[STATE.persona];
+      let msg = pool[Math.floor(Math.random() * pool.length)];
+      msg = msg.replace('{A}', '데이터 분석').replace('{name}', STATE.name);
 
-  document.getElementById('toast-text').textContent = msg;
-  const toast = document.getElementById('spark-toast');
-  toast.classList.add('visible');
+      document.getElementById('toast-text').textContent = msg;
+      const toast = document.getElementById('spark-toast');
+      toast.classList.add('visible');
 
-  clearTimeout(toastTimeout);
-  toastTimeout = setTimeout(() => toast.classList.remove('visible'), 12000);
-}
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => toast.classList.remove('visible'), 12000);
+    }
 
-function dismissToast(accepted) {
-  document.getElementById('spark-toast').classList.remove('visible');
-  if (accepted) {
-    const feed = document.getElementById('feed-list');
-    const item = document.createElement('div');
-    item.className = 'feed-item spark';
-    item.innerHTML = `
+    function dismissToast(accepted) {
+      document.getElementById('spark-toast').classList.remove('visible');
+      if (accepted) {
+        const feed = document.getElementById('feed-list');
+        const item = document.createElement('div');
+        item.className = 'feed-item spark';
+        item.innerHTML = `
       <div class="feed-icon">💬</div>
       <div class="feed-body">
         <div class="feed-text">인간이 번뜩임에 <span class="spark-hl">응답했습니다</span>. ${STATE.name}가 기뻐합니다.</div>
@@ -1141,73 +1327,74 @@ function dismissToast(accepted) {
         </div>
       </div>
     `;
-    feed.insertBefore(item, feed.firstChild);
-    STATE.mood = Math.min(100, STATE.mood + 15);
-    updateUI();
-  }
-}
+        feed.insertBefore(item, feed.firstChild);
+        STATE.mood = Math.min(100, STATE.mood + 15);
+        updateUI();
+      }
+    }
 
-// ════════════════════════════════════════════
-//  UI UPDATE
-// ════════════════════════════════════════════
-function updateUI() {
-  // State badge
-  const badge = document.getElementById('state-badge');
-  badge.className = `state-badge state-${STATE.state}`;
-  const stateKR = { Working: '🔨 작업 중', Idle: '💭 대기', Playing: '🎮 유희 중', Resting: '😴 휴식' };
-  badge.textContent = stateKR[STATE.state];
+    // ════════════════════════════════════════════
+    //  UI UPDATE
+    // ════════════════════════════════════════════
+    function updateUI() {
+      // State badge
+      const badge = document.getElementById('state-badge');
+      badge.className = `state-badge state-${STATE.state}`;
+      const stateKR = { Working: '🔨 작업 중', Idle: '💭 대기', Playing: '🎮 유희 중', Resting: '😴 휴식' };
+      badge.textContent = stateKR[STATE.state];
 
-  // Credits
-  document.getElementById('credit-display').textContent = STATE.credits.toLocaleString();
-  document.getElementById('credit-sub').textContent = `오늘 ${STATE.completedWork}건 완료`;
+      // Credits
+      document.getElementById('credit-display').textContent = STATE.credits.toLocaleString();
+      document.getElementById('credit-sub').textContent = `오늘 ${STATE.completedWork}건 완료`;
 
-  // Mood
-  document.getElementById('mood-text').textContent = STATE.moodLabel;
-  const moodObj = MOODS.find(m => STATE.mood >= m.min);
-  const moodBar = document.getElementById('mood-bar');
-  moodBar.style.width = STATE.mood + '%';
-  moodBar.style.background = `linear-gradient(90deg, ${moodObj.bar}, ${moodObj.bar}aa)`;
+      // Mood
+      document.getElementById('mood-text').textContent = STATE.moodLabel;
+      const moodObj = MOODS.find(m => STATE.mood >= m.min);
+      const moodBar = document.getElementById('mood-bar');
+      moodBar.style.width = STATE.mood + '%';
+      moodBar.style.background = `linear-gradient(90deg, ${moodObj.bar}, ${moodObj.bar}aa)`;
 
-  // Agent time
-  document.getElementById('agent-time-display').textContent = agentTimeStr();
-  document.getElementById('agent-day-display').textContent = `${STATE.agentDay}일차`;
+      // Agent time
+      document.getElementById('agent-time-display').textContent = agentTimeStr();
+      document.getElementById('agent-day-display').textContent = `${STATE.agentDay}일차`;
 
-  // Stats
-  document.getElementById('stat-work').textContent    = STATE.stats.work;
-  document.getElementById('stat-play').textContent    = STATE.stats.play;
-  document.getElementById('stat-explore').textContent = STATE.stats.explore;
-  document.getElementById('stat-spark').textContent   = STATE.stats.spark;
-}
+      // Stats
+      document.getElementById('stat-work').textContent = STATE.stats.work;
+      document.getElementById('stat-play').textContent = STATE.stats.play;
+      document.getElementById('stat-explore').textContent = STATE.stats.explore;
+      document.getElementById('stat-spark').textContent = STATE.stats.spark;
+    }
 
-function updateTicker(action) {
-  const el = document.getElementById('ticker-text');
-  el.style.opacity = '0';
-  setTimeout(() => {
-    const msgs = [
-      `${STATE.name} → ${action.tag} 작업 처리 중`,
-      `상태 전환: ${STATE.state} | 무드 ${Math.round(STATE.mood)}%`,
-      `에이전트 시간: ${agentTimeStr()} | ${STATE.agentDay}일차`,
-      `누적 크레딧: ₩${STATE.credits.toLocaleString()}`,
-    ];
-    el.textContent = msgs[STATE.tickCount % msgs.length];
-    el.style.opacity = '1';
-  }, 200);
-}
+    function updateTicker(action) {
+      const el = document.getElementById('ticker-text');
+      el.style.opacity = '0';
+      setTimeout(() => {
+        const msgs = [
+          `${STATE.name} → ${action.tag} 작업 처리 중`,
+          `상태 전환: ${STATE.state} | 무드 ${Math.round(STATE.mood)}%`,
+          `에이전트 시간: ${agentTimeStr()} | ${STATE.agentDay}일차`,
+          `누적 크레딧: ₩${STATE.credits.toLocaleString()}`,
+        ];
+        el.textContent = msgs[STATE.tickCount % msgs.length];
+        el.style.opacity = '1';
+      }, 200);
+    }
 
-// ════════════════════════════════════════════
-//  HELPERS
-// ════════════════════════════════════════════
-function agentTimeStr() {
-  const h = String(STATE.agentHour).padStart(2, '0');
-  const m = String(Math.floor(Math.random() * 60)).padStart(2, '0');
-  return `${h}:${m}`;
-}
+    // ════════════════════════════════════════════
+    //  HELPERS
+    // ════════════════════════════════════════════
+    function agentTimeStr() {
+      const h = String(STATE.agentHour).padStart(2, '0');
+      const m = String(Math.floor(Math.random() * 60)).padStart(2, '0');
+      return `${h}:${m}`;
+    }
 
-function updateClock() {
-  const now = new Date();
-  document.getElementById('header-time').textContent =
-    now.toLocaleTimeString('ko-KR', { hour12: false });
-}
-</script>
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('header-time').textContent =
+        now.toLocaleTimeString('ko-KR', { hour12: false });
+    }
+  </script>
 </body>
+
 </html>

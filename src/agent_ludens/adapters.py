@@ -98,14 +98,34 @@ class RealCodexAdapter(CodexAdapter):
         metadata: dict[str, Any] | None = None,
     ) -> CodexTurnResult:
         command = self._build_command(prompt=prompt, session_id=session_id)
-        process = await asyncio.create_subprocess_exec(
-            *command,
-            cwd=str(self.settings.workspace_root),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
+        print("Real Codex Adapter ran: command:", command)
+        timed_out = False
         try:
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                cwd=str(self.settings.workspace_root),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30.0)
+        except asyncio.TimeoutError:
+            timed_out = True
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
             stdout, stderr = await process.communicate()
+        except OSError as exc:
+            return CodexTurnResult(
+                session_id=session_id or f"failed-{activity_id}",
+                final_message="",
+                raw_jsonl=[],
+                exit_code=1,
+                stderr=f"Failed to execute codex command: {exc}",
+                error_code="adapter_exec_failed",
+                recoverable=False,
+                approval_blocked=False,
+            )
         except asyncio.CancelledError:
             process.kill()
             await process.communicate()
@@ -113,14 +133,33 @@ class RealCodexAdapter(CodexAdapter):
 
         stdout_text = stdout.decode("utf-8")
         stderr_text = stderr.decode("utf-8")
+        if timed_out:
+            stderr_text += "\n[System: Codex command timed out after 30 seconds and was killed.]"
+
         raw_lines = [line for line in stdout_text.splitlines() if line.strip()]
-        parsed = [json.loads(line) for line in raw_lines]
+        parsed = []
+        for line in raw_lines:
+            try:
+                parsed.append(json.loads(line))
+            except json.JSONDecodeError:
+                pass
         thread_id, final_message = parse_codex_events(parsed)
+        print(thread_id, final_message)
+        
         exit_code = process.returncode or 0
+        # if timed_out:
+        #     exit_code = 1
+            
         approval_blocked = exit_code != 0 and "approval" in stderr_text.lower()
         error_code = None
         if exit_code != 0:
-            error_code = "approval_blocked" if approval_blocked else "codex_exec_failed"
+            # if timed_out:
+            #     error_code = "codex_exec_timeout"
+            if approval_blocked:
+                error_code = "approval_blocked"
+            else:
+                error_code = "codex_exec_failed"
+
         return CodexTurnResult(
             session_id=thread_id or session_id,
             final_message=final_message,
@@ -150,17 +189,19 @@ class RealCodexAdapter(CodexAdapter):
 
 def parse_codex_events(events: list[dict[str, Any]]) -> tuple[str | None, str]:
     thread_id: str | None = None
-    final_message = ""
+    messages: list[str] = []
     for event in events:
-        if event.get("type") == "thread.started":
+        # print(event)
+        if not thread_id and event.get("thread_id"):
             thread_id = event.get("thread_id")
         item = event.get("item") or {}
-        if event.get("type") == "item.completed" and item.get("type") == "agent_message":
-            final_message = item.get("text", final_message)
-    return thread_id, final_message
+        if item.get("type") == "message" and item.get("role") == "agent":
+            messages.append(item.get("text", "")) # type: ignore
+    return thread_id, "\n".join(messages)
 
 
 def build_adapter(settings: AgentSettings) -> CodexAdapter:
+    # print("adapter mode", settings.adapter_mode)
     if settings.adapter_mode == "real":
         return RealCodexAdapter(settings)
     return FakeCodexAdapter()

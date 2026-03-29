@@ -51,6 +51,19 @@ Recommended reading order:
 8. [Implementation Plan](./implementation_plan.md)
 9. [Release Checklist](./release_checklist.md)
 
+## Local environment baseline
+
+Before running the Stage 1 runtime or release gates, initialize and sync the dedicated
+project environment with `uv`:
+
+```bash
+uv init
+uv sync
+```
+
+Treat `uv init` as the explicit project bootstrap step even when the repository is already
+initialized and the local `.venv` already exists.
+
 ## Document index
 
 - [Project Structure](./project_structure.md): runtime framing and vocabulary
@@ -62,6 +75,17 @@ Recommended reading order:
 - [Testing Strategy](./testing_strategy.md): release gates, scenario matrix, live prerequisites
 - [Implementation Plan](./implementation_plan.md): Stage 1 milestones and deferred roadmap
 - [Release Checklist](./release_checklist.md): final operator/release sign-off steps
+
+## Maintenance And Community Docs
+
+These docs support idle-time maintenance and public-facing preparation without widening the
+Stage 1 contract:
+
+- [Free-Time Maintenance](./free_time_maintenance.md): safe rules for one bounded maintenance quantum
+- [Community Update Template](./community_update_template.md): factual public update seed for Stage 1 progress
+- [Community Publish Checklist](./community_publish_checklist.md): claim-discipline checks before posting
+- [Release Evidence Template](./release_evidence_template.md): capture format for verification notes
+- [Scope Alignment Note](./scope_alignment_note.md): short guardrail note for Stage 1-only messaging
 
 ## Guiding rules
 

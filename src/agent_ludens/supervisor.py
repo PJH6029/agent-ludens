@@ -181,56 +181,72 @@ class AgentRuntime:
 
     async def _run_loop(self) -> None:
         while not self._stopping:
-            self._reclaim_expired_leases()
-            request = self.store.lease_next_request(
-                self.settings.agent_id,
-                self.settings.request_lease_ttl_seconds,
-            )
-            if request is not None:
-                self.activity_manager.log_event(
-                    "request.leased",
-                    {
-                        "request_id": request.request_id,
-                        "lease_owner": request.lease_owner,
-                        "leased_until": request.leased_until,
-                    },
+            try:
+                self._reclaim_expired_leases()
+                request = self.store.lease_next_request(
+                    self.settings.agent_id,
+                    self.settings.request_lease_ttl_seconds,
                 )
-                self._current_request_id = request.request_id
-                self._status = AgentStatus.HANDLING_REQUEST
-                self._current_run_task = asyncio.create_task(self._execute_request(request))
-                try:
-                    await self._current_run_task
-                except asyncio.CancelledError:
-                    pass
-                finally:
-                    self._current_run_task = None
-                    self._current_request_id = None
-                    self._current_activity_id = None
-                    self._current_session_id = None
-                    self._status = AgentStatus.IDLE
-                    await self._write_runtime_state()
-                continue
+                if request is not None:
+                    self.activity_manager.log_event(
+                        "request.leased",
+                        {
+                            "request_id": request.request_id,
+                            "lease_owner": request.lease_owner,
+                            "leased_until": request.leased_until,
+                        },
+                    )
+                    self._current_request_id = request.request_id
+                    self._status = AgentStatus.HANDLING_REQUEST
+                    self._current_run_task = asyncio.create_task(self._execute_request(request))
+                    try:
+                        await self._current_run_task
+                    except asyncio.CancelledError:
+                        pass
+                    except Exception as e:
+                        import traceback
+                        print(f"Unhandled error in _execute_request: {e}")
+                        traceback.print_exc()
+                    finally:
+                        self._current_run_task = None
+                        self._current_request_id = None
+                        self._current_activity_id = None
+                        self._current_session_id = None
+                        self._status = AgentStatus.IDLE
+                        await self._write_runtime_state()
+                    continue
 
-            if self.settings.enable_free_time:
-                namespace = next(self._free_time_cycle)
-                self._status = AgentStatus.FREE_TIME
-                self._current_run_task = asyncio.create_task(self._execute_free_time(namespace))
-                try:
-                    await self._current_run_task
-                except asyncio.CancelledError:
-                    pass
-                finally:
-                    self._current_run_task = None
-                    self._current_activity_id = None
-                    self._current_session_id = None
-                    self._status = AgentStatus.IDLE
-                    await self._write_runtime_state()
+                if self.settings.enable_free_time:
+                    namespace = next(self._free_time_cycle)
+                    self._status = AgentStatus.FREE_TIME
+                    self._current_run_task = asyncio.create_task(self._execute_free_time(namespace))
+                    try:
+                        await self._current_run_task
+                    except asyncio.CancelledError:
+                        pass
+                    except Exception as e:
+                        import traceback
+                        print(f"Unhandled error in _execute_free_time: {e}")
+                        traceback.print_exc()
+                    finally:
+                        self._current_run_task = None
+                        self._current_activity_id = None
+                        self._current_session_id = None
+                        self._status = AgentStatus.IDLE
+                        await self._write_runtime_state()
+                    await self._sleep_until_wakeup()
+                    continue
+
+                self._status = AgentStatus.IDLE
+                await self._write_runtime_state()
                 await self._sleep_until_wakeup()
-                continue
-
-            self._status = AgentStatus.IDLE
-            await self._write_runtime_state()
-            await self._sleep_until_wakeup()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                import traceback
+                print(f"Unhandled error in _run_loop body: {e}")
+                traceback.print_exc()
+                await asyncio.sleep(1.0)
 
     async def _sleep_until_wakeup(self) -> None:
         self._wakeup.clear()
@@ -313,6 +329,7 @@ class AgentRuntime:
                     "activity_id": activity.activity_id,
                     "session_id": result.session_id,
                     "exit_code": result.exit_code,
+                    "message": result.final_message,
                 },
             )
             self.activity_manager.write_summary(
@@ -501,11 +518,20 @@ class AgentRuntime:
             self.store.update_activity(activity.activity_id, status=ActivityStatus.COMPLETED, session_id=result.session_id)
             self.activity_manager.write_summary(
                 activity,
-                objective=f"Spend one free-time quantum on {namespace.value} work.",
+                objective=f"Spend free-time on {namespace.value} work.",
                 why="The runtime used idle time productively.",
-                completed_steps=["One free-time quantum completed."],
+                completed_steps=[result.final_message] if result.final_message else ["One free-time quantum completed."],
                 pending_steps=[],
                 next_step="No further action required.",
+            )
+            self.activity_manager.log_event(
+                "free_time.completed",
+                {
+                    "activity_id": activity.activity_id,
+                    "namespace": namespace.value,
+                    "session_id": result.session_id,
+                    "message": result.final_message,
+                },
             )
 
     def _ensure_request_activity(self, request: RequestRecord) -> ActivityRecord:

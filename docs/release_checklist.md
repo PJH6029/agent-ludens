@@ -15,6 +15,7 @@ Confirm the release still targets **Stage 1 only**:
 
 ## 2. Environment prerequisites
 
+- [ ] `uv init` confirmed the dedicated project environment
 - [ ] `uv sync` completed successfully
 - [ ] `codex-cli 0.117.0` (or intentionally re-validated replacement) is installed
 - [ ] real Codex profile is available for live verification, or a blocker is recorded
