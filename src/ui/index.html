@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Remote Control All-in-One</title>
+    <link rel="stylesheet" href="/ui/app.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>Remote Control All-in-One</h1>
+        <p class="subtitle">Local-first control plane for CLI coding agents</p>
+      </div>
+      <nav class="nav">
+        <a href="#/dashboard">Dashboard</a>
+        <a href="#/settings">Settings</a>
+        <a href="#/doctor">Doctor</a>
+      </nav>
+    </header>
+
+    <main class="layout">
+      <section id="login-view" class="panel hidden"></section>
+      <section id="dashboard-view" class="panel hidden"></section>
+      <section id="workspace-view" class="panel hidden"></section>
+      <section id="settings-view" class="panel hidden"></section>
+      <section id="doctor-view" class="panel hidden"></section>
+    </main>
+
+    <script type="module" src="/ui/app.js"></script>
+  </body>
+</html>

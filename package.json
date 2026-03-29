@@ -1,0 +1,57 @@
+{
+  "name": "remote-control-all-in-one",
+  "version": "0.1.0",
+  "description": "Local-first web control plane for CLI coding agents.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "dev": "tsx src/cli/index.ts internal-daemon",
+    "start": "tsx src/cli/index.ts internal-daemon",
+    "lint": "eslint . --ext .ts,.js",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run test:unit && npm run test:int",
+    "test:unit": "vitest run test/unit",
+    "test:int": "vitest run test/integration",
+    "test:e2e": "playwright test",
+    "test:live": "tsx test/live/run-live.ts",
+    "check": "npm run lint && npm run typecheck && npm run test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PJH6029/remote-control-all-in-one.git"
+  },
+  "keywords": [
+    "agents",
+    "control-plane",
+    "fastify",
+    "local-first"
+  ],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/PJH6029/remote-control-all-in-one/issues"
+  },
+  "homepage": "https://github.com/PJH6029/remote-control-all-in-one#readme",
+  "dependencies": {
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/static": "^9.0.0",
+    "@fastify/websocket": "^11.2.0",
+    "fastify": "^5.8.4",
+    "nanoid": "^5.1.7",
+    "ws": "^8.20.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.5.0",
+    "@vitest/coverage-v8": "^4.1.2",
+    "eslint": "^10.1.0",
+    "globals": "^17.4.0",
+    "playwright": "^1.58.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.57.2",
+    "vitest": "^4.1.2"
+  }
+}
