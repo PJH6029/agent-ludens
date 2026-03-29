@@ -4,6 +4,7 @@ import json
 import sqlite3
 import threading
 from collections.abc import Sequence
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -21,7 +22,7 @@ from agent_ludens.models import (
     RequestSource,
     RequestStatus,
 )
-from agent_ludens.utils import new_request_id, payload_fingerprint, utc_now_iso
+from agent_ludens.utils import new_request_id, payload_fingerprint, utc_now, utc_now_iso
 
 
 class ConflictError(RuntimeError):
@@ -226,7 +227,8 @@ class SQLiteStore:
             if row is None:
                 return None
 
-            leased_until = utc_now_iso()
+            lease_deadline = utc_now() + timedelta(seconds=max(lease_ttl_seconds, 0))
+            leased_until = lease_deadline.isoformat().replace("+00:00", "Z")
             conn.execute(
                 "UPDATE requests SET status = ?, lease_owner = ?, leased_until = ?, updated_at = ? WHERE request_id = ?",
                 (RequestStatus.LEASED, lease_owner, leased_until, utc_now_iso(), row["request_id"]),
@@ -239,6 +241,37 @@ class SQLiteStore:
             )
             conn.commit()
             return self.get_request(row["request_id"])
+
+    def reclaim_expired_leases(self, now: str | None = None) -> list[str]:
+        reference_time = now or utc_now_iso()
+        with self._lock, self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT request_id, lease_owner, leased_until
+                FROM requests
+                WHERE status = ? AND leased_until IS NOT NULL AND leased_until <= ?
+                ORDER BY leased_until ASC
+                """,
+                (RequestStatus.LEASED, reference_time),
+            ).fetchall()
+            reclaimed_ids: list[str] = []
+            for row in rows:
+                conn.execute(
+                    "UPDATE requests SET status = ?, lease_owner = NULL, leased_until = NULL, updated_at = ? WHERE request_id = ?",
+                    (RequestStatus.QUEUED, utc_now_iso(), row["request_id"]),
+                )
+                self._insert_request_event(
+                    conn,
+                    row["request_id"],
+                    "lease_reclaimed",
+                    {
+                        "expired_at": row["leased_until"],
+                        "previous_lease_owner": row["lease_owner"],
+                    },
+                )
+                reclaimed_ids.append(row["request_id"])
+            conn.commit()
+            return reclaimed_ids
 
     def mark_request_running(self, request_id: str, activity_id: str) -> RequestRecord:
         with self._lock, self._connect() as conn:

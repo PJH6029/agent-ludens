@@ -43,3 +43,11 @@ class AgentSettings(BaseSettings):
     @property
     def runtime_dir(self) -> Path:
         return self.task_memory_root / "runtime"
+
+    @property
+    def event_log_path(self) -> Path:
+        return self.runtime_dir / "event-log.jsonl"
+
+    @property
+    def supervisor_lock_path(self) -> Path:
+        return self.runtime_dir / "supervisor.lock"

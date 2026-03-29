@@ -78,6 +78,10 @@ def create_app(settings: AgentSettings | None = None, runtime: AgentRuntime | No
     async def queue() -> dict[str, Any]:
         return runtime.store.get_queue_snapshot().model_dump(mode="json")
 
+    @app.get("/v1/events")
+    async def events(limit: int = 50) -> list[dict[str, Any]]:
+        return runtime.list_recent_events(limit=limit)
+
     @app.post("/v1/requests", status_code=202)
     async def create_request(payload: RequestCreate) -> dict[str, Any]:
         try:
