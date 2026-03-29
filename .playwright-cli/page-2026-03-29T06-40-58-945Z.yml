@@ -1,0 +1,220 @@
+- generic [ref=e3]:
+  - generic:
+    - img
+  - generic [ref=e4]:
+    - generic [ref=e8]:
+      - heading "Agent Ludens 0.1.0 OAS 3.1" [level=1] [ref=e9]:
+        - text: Agent Ludens
+        - generic [ref=e10]:
+          - generic [ref=e12]: 0.1.0
+          - generic [ref=e14]: OAS 3.1
+      - link "/openapi.json" [ref=e15] [cursor=pointer]:
+        - /url: /openapi.json
+        - generic [ref=e16]: /openapi.json
+    - generic [ref=e21]:
+      - heading "default Collapse operation" [level=3] [ref=e22] [cursor=pointer]:
+        - link "default" [ref=e23]:
+          - /url: "#/default"
+        - button "Collapse operation" [expanded] [ref=e24]:
+          - img [ref=e25]
+      - generic [ref=e28]:
+        - generic [ref=e31] [cursor=pointer]:
+          - button "GET /healthz Healthz" [ref=e32]:
+            - generic [ref=e33]: GET
+            - generic [ref=e34]:
+              - link "/healthz" [ref=e36]:
+                - /url: "#/default/healthz_healthz_get"
+              - generic [ref=e37]: Healthz
+          - generic "Copy to clipboard"
+          - button "get /healthz" [ref=e40]:
+            - img [ref=e41]
+        - generic [ref=e45] [cursor=pointer]:
+          - button "GET /v1/agent Agent" [ref=e46]:
+            - generic [ref=e47]: GET
+            - generic [ref=e48]:
+              - link "/v1/agent" [ref=e50]:
+                - /url: "#/default/agent_v1_agent_get"
+                - generic [ref=e51]:
+                  - text: /v1
+                  - text: /agent
+              - generic [ref=e52]: Agent
+          - generic "Copy to clipboard"
+          - button "get /v1/agent" [ref=e55]:
+            - img [ref=e56]
+        - generic [ref=e60] [cursor=pointer]:
+          - button "GET /v1/queue Queue" [ref=e61]:
+            - generic [ref=e62]: GET
+            - generic [ref=e63]:
+              - link "/v1/queue" [ref=e65]:
+                - /url: "#/default/queue_v1_queue_get"
+                - generic [ref=e66]:
+                  - text: /v1
+                  - text: /queue
+              - generic [ref=e67]: Queue
+          - generic "Copy to clipboard"
+          - button "get /v1/queue" [ref=e70]:
+            - img [ref=e71]
+        - generic [ref=e75] [cursor=pointer]:
+          - button "POST /v1/requests Create Request" [ref=e76]:
+            - generic [ref=e77]: POST
+            - generic [ref=e78]:
+              - link "/v1/requests" [ref=e80]:
+                - /url: "#/default/create_request_v1_requests_post"
+                - generic [ref=e81]:
+                  - text: /v1
+                  - text: /requests
+              - generic [ref=e82]: Create Request
+          - generic "Copy to clipboard"
+          - button "post /v1/requests" [ref=e85]:
+            - img [ref=e86]
+        - generic [ref=e90] [cursor=pointer]:
+          - 'button "GET /v1/requests/{request_id} Get Request" [ref=e91]':
+            - generic [ref=e92]: GET
+            - generic [ref=e93]:
+              - 'link "/v1/requests/{request_id}" [ref=e95]':
+                - /url: "#/default/get_request_v1_requests__request_id__get"
+                - generic [ref=e96]:
+                  - text: /v1
+                  - text: /requests
+                  - text: "/{request_id}"
+              - generic [ref=e97]: Get Request
+          - generic "Copy to clipboard"
+          - 'button "get /v1/requests/{request_id}" [ref=e100]':
+            - img [ref=e101]
+        - generic [ref=e105] [cursor=pointer]:
+          - 'button "POST /v1/requests/{request_id}/cancel Cancel Request" [ref=e106]':
+            - generic [ref=e107]: POST
+            - generic [ref=e108]:
+              - 'link "/v1/requests/{request_id}/cancel" [ref=e110]':
+                - /url: "#/default/cancel_request_v1_requests__request_id__cancel_post"
+                - generic [ref=e111]:
+                  - text: /v1
+                  - text: /requests
+                  - text: "/{request_id}"
+                  - text: /cancel
+              - generic [ref=e112]: Cancel Request
+          - generic "Copy to clipboard"
+          - 'button "post /v1/requests/{request_id}/cancel" [ref=e115]':
+            - img [ref=e116]
+        - generic [ref=e120] [cursor=pointer]:
+          - button "GET /v1/activities List Activities" [ref=e121]:
+            - generic [ref=e122]: GET
+            - generic [ref=e123]:
+              - link "/v1/activities" [ref=e125]:
+                - /url: "#/default/list_activities_v1_activities_get"
+                - generic [ref=e126]:
+                  - text: /v1
+                  - text: /activities
+              - generic [ref=e127]: List Activities
+          - generic "Copy to clipboard"
+          - button "get /v1/activities" [ref=e130]:
+            - img [ref=e131]
+        - generic [ref=e135] [cursor=pointer]:
+          - 'button "GET /v1/activities/{activity_id} Get Activity" [ref=e136]':
+            - generic [ref=e137]: GET
+            - generic [ref=e138]:
+              - 'link "/v1/activities/{activity_id}" [ref=e140]':
+                - /url: "#/default/get_activity_v1_activities__activity_id__get"
+                - generic [ref=e141]:
+                  - text: /v1
+                  - text: /activities
+                  - text: "/{activity_id}"
+              - generic [ref=e142]: Get Activity
+          - generic "Copy to clipboard"
+          - 'button "get /v1/activities/{activity_id}" [ref=e145]':
+            - img [ref=e146]
+        - generic [ref=e150] [cursor=pointer]:
+          - button "GET /v1/peers List Peers" [ref=e151]:
+            - generic [ref=e152]: GET
+            - generic [ref=e153]:
+              - link "/v1/peers" [ref=e155]:
+                - /url: "#/default/list_peers_v1_peers_get"
+                - generic [ref=e156]:
+                  - text: /v1
+                  - text: /peers
+              - generic [ref=e157]: List Peers
+          - generic "Copy to clipboard"
+          - button "get /v1/peers" [ref=e160]:
+            - img [ref=e161]
+        - generic [ref=e165] [cursor=pointer]:
+          - button "POST /v1/peers Register Peer" [ref=e166]:
+            - generic [ref=e167]: POST
+            - generic [ref=e168]:
+              - link "/v1/peers" [ref=e170]:
+                - /url: "#/default/register_peer_v1_peers_post"
+                - generic [ref=e171]:
+                  - text: /v1
+                  - text: /peers
+              - generic [ref=e172]: Register Peer
+          - generic "Copy to clipboard"
+          - button "post /v1/peers" [ref=e175]:
+            - img [ref=e176]
+    - generic [ref=e180]:
+      - heading "Schemas" [level=4] [ref=e181] [cursor=pointer]:
+        - button "Schemas" [expanded] [ref=e182]:
+          - generic [ref=e183]: Schemas
+          - img [ref=e184]
+      - generic [ref=e186]:
+        - article [ref=e187]:
+          - generic [ref=e188]:
+            - button "ActivityStatus" [ref=e189] [cursor=pointer]:
+              - generic [ref=e191]: ActivityStatus
+              - img [ref=e193]
+            - button "Expand all" [ref=e195] [cursor=pointer]
+            - strong [ref=e196]: string
+        - article [ref=e197]:
+          - generic [ref=e198]:
+            - button "HTTPValidationError" [ref=e199] [cursor=pointer]:
+              - generic [ref=e201]: HTTPValidationError
+              - img [ref=e203]
+            - button "Expand all" [ref=e205] [cursor=pointer]
+            - strong [ref=e206]: object
+        - article [ref=e207]:
+          - generic [ref=e208]:
+            - button "PeerRecord" [ref=e209] [cursor=pointer]:
+              - generic [ref=e211]: PeerRecord
+              - img [ref=e213]
+            - button "Expand all" [ref=e215] [cursor=pointer]
+            - strong [ref=e216]: object
+        - article [ref=e217]:
+          - generic [ref=e218]:
+            - button "ReplyConfig" [ref=e219] [cursor=pointer]:
+              - generic [ref=e221]: ReplyConfig
+              - img [ref=e223]
+            - button "Expand all" [ref=e225] [cursor=pointer]
+            - strong [ref=e226]: object
+        - article [ref=e227]:
+          - generic [ref=e228]:
+            - button "ReplyTarget" [ref=e229] [cursor=pointer]:
+              - generic [ref=e231]: ReplyTarget
+              - img [ref=e233]
+            - button "Expand all" [ref=e235] [cursor=pointer]
+            - strong [ref=e236]: object
+        - article [ref=e237]:
+          - generic [ref=e238]:
+            - button "RequestCreate" [ref=e239] [cursor=pointer]:
+              - generic [ref=e241]: RequestCreate
+              - img [ref=e243]
+            - button "Expand all" [ref=e245] [cursor=pointer]
+            - strong [ref=e246]: object
+        - article [ref=e247]:
+          - generic [ref=e248]:
+            - button "RequestKind" [ref=e249] [cursor=pointer]:
+              - generic [ref=e251]: RequestKind
+              - img [ref=e253]
+            - button "Expand all" [ref=e255] [cursor=pointer]
+            - strong [ref=e256]: string
+        - article [ref=e257]:
+          - generic [ref=e258]:
+            - button "RequestSource" [ref=e259] [cursor=pointer]:
+              - generic [ref=e261]: RequestSource
+              - img [ref=e263]
+            - button "Expand all" [ref=e265] [cursor=pointer]
+            - strong [ref=e266]: object
+        - article [ref=e267]:
+          - generic [ref=e268]:
+            - button "ValidationError" [ref=e269] [cursor=pointer]:
+              - generic [ref=e271]: ValidationError
+              - img [ref=e273]
+            - button "Expand all" [ref=e275] [cursor=pointer]
+            - strong [ref=e276]: object
