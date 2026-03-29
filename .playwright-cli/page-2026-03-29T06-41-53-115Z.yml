@@ -1,0 +1,383 @@
+- generic [ref=e3]:
+  - generic:
+    - img
+  - generic [ref=e4]:
+    - generic [ref=e8]:
+      - heading "Agent Ludens 0.1.0 OAS 3.1" [level=1] [ref=e9]:
+        - text: Agent Ludens
+        - generic [ref=e10]:
+          - generic [ref=e12]: 0.1.0
+          - generic [ref=e14]: OAS 3.1
+      - link "/openapi.json" [ref=e15] [cursor=pointer]:
+        - /url: /openapi.json
+        - generic [ref=e16]: /openapi.json
+    - generic [ref=e21]:
+      - heading "default Collapse operation" [level=3] [ref=e22] [cursor=pointer]:
+        - link "default" [ref=e23]:
+          - /url: "#/default"
+        - button "Collapse operation" [expanded] [ref=e24]:
+          - img [ref=e25]
+      - generic [ref=e28]:
+        - generic [ref=e31] [cursor=pointer]:
+          - button "GET /healthz Healthz" [ref=e32]:
+            - generic [ref=e33]: GET
+            - generic [ref=e34]:
+              - link "/healthz" [ref=e36]:
+                - /url: "#/default/healthz_healthz_get"
+              - generic [ref=e37]: Healthz
+          - generic "Copy to clipboard"
+          - button "get /healthz" [ref=e40]:
+            - img [ref=e41]
+        - generic [ref=e45] [cursor=pointer]:
+          - button "GET /v1/agent Agent" [ref=e46]:
+            - generic [ref=e47]: GET
+            - generic [ref=e48]:
+              - link "/v1/agent" [ref=e50]:
+                - /url: "#/default/agent_v1_agent_get"
+                - generic [ref=e51]:
+                  - text: /v1
+                  - text: /agent
+              - generic [ref=e52]: Agent
+          - generic "Copy to clipboard"
+          - button "get /v1/agent" [ref=e55]:
+            - img [ref=e56]
+        - generic [ref=e60] [cursor=pointer]:
+          - button "GET /v1/queue Queue" [ref=e61]:
+            - generic [ref=e62]: GET
+            - generic [ref=e63]:
+              - link "/v1/queue" [ref=e65]:
+                - /url: "#/default/queue_v1_queue_get"
+                - generic [ref=e66]:
+                  - text: /v1
+                  - text: /queue
+              - generic [ref=e67]: Queue
+          - generic "Copy to clipboard"
+          - button "get /v1/queue" [ref=e70]:
+            - img [ref=e71]
+        - generic [ref=e74]:
+          - generic [ref=e75] [cursor=pointer]:
+            - button "POST /v1/requests Create Request" [expanded] [ref=e76]:
+              - generic [ref=e77]: POST
+              - generic [ref=e78]:
+                - link "/v1/requests" [ref=e80]:
+                  - /url: "#/default/create_request_v1_requests_post"
+                  - generic [ref=e81]:
+                    - text: /v1
+                    - text: /requests
+                - generic [ref=e82]: Create Request
+            - generic "Copy to clipboard"
+            - button "post /v1/requests" [expanded] [ref=e85]:
+              - img [ref=e279]
+          - generic [ref=e282]:
+            - generic [ref=e283]:
+              - generic [ref=e284]:
+                - heading "Parameters" [level=4] [ref=e287] [cursor=pointer]
+                - generic [ref=e288]:
+                  - button "Cancel" [ref=e365] [cursor=pointer]
+                  - button "Reset" [ref=e371] [cursor=pointer]
+              - paragraph [ref=e292]: No parameters
+              - generic [ref=e293]:
+                - generic [ref=e294]:
+                  - heading "Request bodyrequired" [level=4] [ref=e295]
+                  - combobox "Request content type" [ref=e298]:
+                    - option "application/json" [selected]
+                - generic [ref=e301]:
+                  - tablist [ref=e302]:
+                    - tab "Edit Value" [selected] [ref=e366] [cursor=pointer]
+                    - tab "Schema" [ref=e304] [cursor=pointer]
+                  - tabpanel "Edit Value" [ref=e367]:
+                    - textbox [ref=e369]: "{\"kind\":\"human_task\",\"priority\":50,\"source\":{\"type\":\"human\",\"id\":\"playwright-browser-7101\"},\"summary\":\"Playwright browser smoke 7101\",\"details\":{\"instructions\":\"Reply with exactly PLAYWRIGHT_BROWSER_7101_OK.\"}}"
+            - generic [ref=e309]:
+              - button "Execute" [ref=e370] [cursor=pointer]
+              - button "Clear" [ref=e372] [cursor=pointer]
+            - generic [ref=e310]:
+              - heading "Responses" [level=4] [ref=e312]
+              - generic [ref=e313]:
+                - generic [ref=e373]:
+                  - generic [ref=e374]:
+                    - generic [ref=e375]:
+                      - heading "Curl" [level=4] [ref=e376]
+                      - button [ref=e378] [cursor=pointer]
+                      - code [ref=e381]: "curl -X 'POST' \\ 'http://127.0.0.1:7101/v1/requests' \\ -H 'accept: application/json' \\ -H 'Content-Type: application/json' \\ -d '{\"kind\":\"human_task\",\"priority\":50,\"source\":{\"type\":\"human\",\"id\":\"playwright-browser-7101\"},\"summary\":\"Playwright browser smoke 7101\",\"details\":{\"instructions\":\"Reply with exactly PLAYWRIGHT_BROWSER_7101_OK.\"}}'"
+                    - generic [ref=e383]:
+                      - heading "Request URL" [level=4] [ref=e384]
+                      - generic [ref=e385]: http://127.0.0.1:7101/v1/requests
+                    - heading "Server response" [level=4] [ref=e386]
+                    - table [ref=e387]:
+                      - rowgroup [ref=e388]:
+                        - row "Code Details" [ref=e389]:
+                          - cell "Code" [ref=e390]
+                          - cell "Details" [ref=e391]
+                      - rowgroup [ref=e392]:
+                        - 'row "202 Response body Download { \"request_id\": \"req_a5bec7a7ae81\", \"status\": \"queued\", \"accepted_at\": \"2026-03-29T06:41:17.870051Z\" } Response headers content-length: 95 content-type: application/json date: Sun,29 Mar 2026 06:41:17 GMT server: uvicorn" [ref=e393]':
+                          - cell "202" [ref=e394]
+                          - 'cell "Response body Download { \"request_id\": \"req_a5bec7a7ae81\", \"status\": \"queued\", \"accepted_at\": \"2026-03-29T06:41:17.870051Z\" } Response headers content-length: 95 content-type: application/json date: Sun,29 Mar 2026 06:41:17 GMT server: uvicorn" [ref=e395]':
+                            - generic [ref=e396]:
+                              - heading "Response body" [level=5] [ref=e397]
+                              - generic [ref=e398]:
+                                - button [ref=e400] [cursor=pointer]
+                                - button "Download" [ref=e401] [cursor=pointer]
+                                - code [ref=e403]: "{ \"request_id\": \"req_a5bec7a7ae81\", \"status\": \"queued\", \"accepted_at\": \"2026-03-29T06:41:17.870051Z\" }"
+                            - generic [ref=e404]:
+                              - heading "Response headers" [level=5] [ref=e405]
+                              - generic [ref=e406]:
+                                - generic [ref=e407]: "content-length: 95"
+                                - generic [ref=e408]: "content-type: application/json"
+                                - generic [ref=e409]: "date: Sun,29 Mar 2026 06:41:17 GMT"
+                                - generic [ref=e410]: "server: uvicorn"
+                  - heading "Responses" [level=4] [ref=e411]
+                - region [ref=e314]:
+                  - rowgroup [ref=e315]:
+                    - row "Code Description Links" [ref=e316]:
+                      - cell "Code" [ref=e317]
+                      - cell "Description" [ref=e318]
+                      - cell "Links" [ref=e319]
+                  - rowgroup [ref=e320]:
+                    - row "202 Successful Response Media type application/json Controls Accept header. Example Value No links" [ref=e321]:
+                      - cell "202" [ref=e322]
+                      - cell "Successful Response Media type application/json Controls Accept header. Example Value" [ref=e323]:
+                        - paragraph [ref=e326]: Successful Response
+                        - generic [ref=e328]:
+                          - generic [ref=e329]: Media type
+                          - combobox "Media Type" [ref=e331]:
+                            - option "application/json" [selected]
+                          - generic [ref=e332]:
+                            - text: Controls
+                            - code [ref=e333]: Accept
+                            - text: header.
+                        - generic [ref=e334]:
+                          - tablist [ref=e335]:
+                            - tab "Example Value" [selected] [ref=e336] [cursor=pointer]
+                            - tab "Schema" [ref=e337] [cursor=pointer]
+                          - tabpanel "Example Value" [ref=e338]:
+                            - code [ref=e342]: "{ \"additionalProp1\": {} }"
+                      - cell "No links" [ref=e343]
+                    - row "422 Validation Error Media type application/json Example Value No links" [ref=e344]:
+                      - cell "422" [ref=e345]
+                      - cell "Validation Error Media type application/json Example Value" [ref=e346]:
+                        - paragraph [ref=e349]: Validation Error
+                        - generic [ref=e351]:
+                          - generic [ref=e352]: Media type
+                          - combobox "Media Type" [ref=e354]:
+                            - option "application/json" [selected]
+                        - generic [ref=e355]:
+                          - tablist [ref=e356]:
+                            - tab "Example Value" [selected] [ref=e357] [cursor=pointer]
+                            - tab "Schema" [ref=e358] [cursor=pointer]
+                          - tabpanel "Example Value" [ref=e359]:
+                            - code [ref=e363]: "{ \"detail\": [ { \"loc\": [ \"string\", 0 ], \"msg\": \"string\", \"type\": \"string\", \"input\": \"string\", \"ctx\": {} } ] }"
+                      - cell "No links" [ref=e364]
+        - generic [ref=e89]:
+          - generic [ref=e90] [cursor=pointer]:
+            - 'button "GET /v1/requests/{request_id} Get Request" [expanded] [ref=e91]':
+              - generic [ref=e92]: GET
+              - generic [ref=e93]:
+                - 'link "/v1/requests/{request_id}" [ref=e95]':
+                  - /url: "#/default/get_request_v1_requests__request_id__get"
+                  - generic [ref=e96]:
+                    - text: /v1
+                    - text: /requests
+                    - text: "/{request_id}"
+                - generic [ref=e97]: Get Request
+            - generic "Copy to clipboard"
+            - 'button "get /v1/requests/{request_id}" [expanded] [ref=e100]':
+              - img [ref=e414]
+          - generic [ref=e417]:
+            - generic [ref=e418]:
+              - generic [ref=e419]:
+                - heading "Parameters" [level=4] [ref=e422] [cursor=pointer]
+                - button "Cancel" [active] [ref=e496] [cursor=pointer]
+              - table [ref=e427]:
+                - rowgroup [ref=e428]:
+                  - row "Name Description" [ref=e429]:
+                    - columnheader "Name" [ref=e430]
+                    - columnheader "Description" [ref=e431]
+                - rowgroup [ref=e432]:
+                  - row "request_id *required string (path)" [ref=e433]:
+                    - cell "request_id *required string (path)" [ref=e434]:
+                      - generic [ref=e435]: request_id *required
+                      - generic [ref=e436]: string
+                      - generic [ref=e437]: (path)
+                    - cell [ref=e438]:
+                      - textbox "request_id" [ref=e439]
+            - button "Execute" [ref=e497] [cursor=pointer]
+            - generic [ref=e441]:
+              - heading "Responses" [level=4] [ref=e443]
+              - region [ref=e445]:
+                - rowgroup [ref=e446]:
+                  - row "Code Description Links" [ref=e447]:
+                    - cell "Code" [ref=e448]
+                    - cell "Description" [ref=e449]
+                    - cell "Links" [ref=e450]
+                - rowgroup [ref=e451]:
+                  - row "200 Successful Response Media type application/json Controls Accept header. Example Value No links" [ref=e452]:
+                    - cell "200" [ref=e453]
+                    - cell "Successful Response Media type application/json Controls Accept header. Example Value" [ref=e454]:
+                      - paragraph [ref=e457]: Successful Response
+                      - generic [ref=e459]:
+                        - generic [ref=e460]: Media type
+                        - combobox "Media Type" [ref=e462]:
+                          - option "application/json" [selected]
+                        - generic [ref=e463]:
+                          - text: Controls
+                          - code [ref=e464]: Accept
+                          - text: header.
+                      - generic [ref=e465]:
+                        - tablist [ref=e466]:
+                          - tab "Example Value" [selected] [ref=e467] [cursor=pointer]
+                          - tab "Schema" [ref=e468] [cursor=pointer]
+                        - tabpanel "Example Value" [ref=e469]:
+                          - code [ref=e473]: "{ \"additionalProp1\": {} }"
+                    - cell "No links" [ref=e474]
+                  - row "422 Validation Error Media type application/json Example Value No links" [ref=e475]:
+                    - cell "422" [ref=e476]
+                    - cell "Validation Error Media type application/json Example Value" [ref=e477]:
+                      - paragraph [ref=e480]: Validation Error
+                      - generic [ref=e482]:
+                        - generic [ref=e483]: Media type
+                        - combobox "Media Type" [ref=e485]:
+                          - option "application/json" [selected]
+                      - generic [ref=e486]:
+                        - tablist [ref=e487]:
+                          - tab "Example Value" [selected] [ref=e488] [cursor=pointer]
+                          - tab "Schema" [ref=e489] [cursor=pointer]
+                        - tabpanel "Example Value" [ref=e490]:
+                          - code [ref=e494]: "{ \"detail\": [ { \"loc\": [ \"string\", 0 ], \"msg\": \"string\", \"type\": \"string\", \"input\": \"string\", \"ctx\": {} } ] }"
+                    - cell "No links" [ref=e495]
+        - generic [ref=e105] [cursor=pointer]:
+          - 'button "POST /v1/requests/{request_id}/cancel Cancel Request" [ref=e106]':
+            - generic [ref=e107]: POST
+            - generic [ref=e108]:
+              - 'link "/v1/requests/{request_id}/cancel" [ref=e110]':
+                - /url: "#/default/cancel_request_v1_requests__request_id__cancel_post"
+                - generic [ref=e111]:
+                  - text: /v1
+                  - text: /requests
+                  - text: "/{request_id}"
+                  - text: /cancel
+              - generic [ref=e112]: Cancel Request
+          - generic "Copy to clipboard"
+          - 'button "post /v1/requests/{request_id}/cancel" [ref=e115]':
+            - img [ref=e116]
+        - generic [ref=e120] [cursor=pointer]:
+          - button "GET /v1/activities List Activities" [ref=e121]:
+            - generic [ref=e122]: GET
+            - generic [ref=e123]:
+              - link "/v1/activities" [ref=e125]:
+                - /url: "#/default/list_activities_v1_activities_get"
+                - generic [ref=e126]:
+                  - text: /v1
+                  - text: /activities
+              - generic [ref=e127]: List Activities
+          - generic "Copy to clipboard"
+          - button "get /v1/activities" [ref=e130]:
+            - img [ref=e131]
+        - generic [ref=e135] [cursor=pointer]:
+          - 'button "GET /v1/activities/{activity_id} Get Activity" [ref=e136]':
+            - generic [ref=e137]: GET
+            - generic [ref=e138]:
+              - 'link "/v1/activities/{activity_id}" [ref=e140]':
+                - /url: "#/default/get_activity_v1_activities__activity_id__get"
+                - generic [ref=e141]:
+                  - text: /v1
+                  - text: /activities
+                  - text: "/{activity_id}"
+              - generic [ref=e142]: Get Activity
+          - generic "Copy to clipboard"
+          - 'button "get /v1/activities/{activity_id}" [ref=e145]':
+            - img [ref=e146]
+        - generic [ref=e150] [cursor=pointer]:
+          - button "GET /v1/peers List Peers" [ref=e151]:
+            - generic [ref=e152]: GET
+            - generic [ref=e153]:
+              - link "/v1/peers" [ref=e155]:
+                - /url: "#/default/list_peers_v1_peers_get"
+                - generic [ref=e156]:
+                  - text: /v1
+                  - text: /peers
+              - generic [ref=e157]: List Peers
+          - generic "Copy to clipboard"
+          - button "get /v1/peers" [ref=e160]:
+            - img [ref=e161]
+        - generic [ref=e165] [cursor=pointer]:
+          - button "POST /v1/peers Register Peer" [ref=e166]:
+            - generic [ref=e167]: POST
+            - generic [ref=e168]:
+              - link "/v1/peers" [ref=e170]:
+                - /url: "#/default/register_peer_v1_peers_post"
+                - generic [ref=e171]:
+                  - text: /v1
+                  - text: /peers
+              - generic [ref=e172]: Register Peer
+          - generic "Copy to clipboard"
+          - button "post /v1/peers" [ref=e175]:
+            - img [ref=e176]
+    - generic [ref=e180]:
+      - heading "Schemas" [level=4] [ref=e181] [cursor=pointer]:
+        - button "Schemas" [expanded] [ref=e182]:
+          - generic [ref=e183]: Schemas
+          - img [ref=e184]
+      - generic [ref=e186]:
+        - article [ref=e187]:
+          - generic [ref=e188]:
+            - button "ActivityStatus" [ref=e189] [cursor=pointer]:
+              - generic [ref=e191]: ActivityStatus
+              - img [ref=e193]
+            - button "Expand all" [ref=e195] [cursor=pointer]
+            - strong [ref=e196]: string
+        - article [ref=e197]:
+          - generic [ref=e198]:
+            - button "HTTPValidationError" [ref=e199] [cursor=pointer]:
+              - generic [ref=e201]: HTTPValidationError
+              - img [ref=e203]
+            - button "Expand all" [ref=e205] [cursor=pointer]
+            - strong [ref=e206]: object
+        - article [ref=e207]:
+          - generic [ref=e208]:
+            - button "PeerRecord" [ref=e209] [cursor=pointer]:
+              - generic [ref=e211]: PeerRecord
+              - img [ref=e213]
+            - button "Expand all" [ref=e215] [cursor=pointer]
+            - strong [ref=e216]: object
+        - article [ref=e217]:
+          - generic [ref=e218]:
+            - button "ReplyConfig" [ref=e219] [cursor=pointer]:
+              - generic [ref=e221]: ReplyConfig
+              - img [ref=e223]
+            - button "Expand all" [ref=e225] [cursor=pointer]
+            - strong [ref=e226]: object
+        - article [ref=e227]:
+          - generic [ref=e228]:
+            - button "ReplyTarget" [ref=e229] [cursor=pointer]:
+              - generic [ref=e231]: ReplyTarget
+              - img [ref=e233]
+            - button "Expand all" [ref=e235] [cursor=pointer]
+            - strong [ref=e236]: object
+        - article [ref=e237]:
+          - generic [ref=e238]:
+            - button "RequestCreate" [ref=e239] [cursor=pointer]:
+              - generic [ref=e241]: RequestCreate
+              - img [ref=e243]
+            - button "Expand all" [ref=e245] [cursor=pointer]
+            - strong [ref=e246]: object
+        - article [ref=e247]:
+          - generic [ref=e248]:
+            - button "RequestKind" [ref=e249] [cursor=pointer]:
+              - generic [ref=e251]: RequestKind
+              - img [ref=e253]
+            - button "Expand all" [ref=e255] [cursor=pointer]
+            - strong [ref=e256]: string
+        - article [ref=e257]:
+          - generic [ref=e258]:
+            - button "RequestSource" [ref=e259] [cursor=pointer]:
+              - generic [ref=e261]: RequestSource
+              - img [ref=e263]
+            - button "Expand all" [ref=e265] [cursor=pointer]
+            - strong [ref=e266]: object
+        - article [ref=e267]:
+          - generic [ref=e268]:
+            - button "ValidationError" [ref=e269] [cursor=pointer]:
+              - generic [ref=e271]: ValidationError
+              - img [ref=e273]
+            - button "Expand all" [ref=e275] [cursor=pointer]
+            - strong [ref=e276]: object
