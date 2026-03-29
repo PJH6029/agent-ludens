@@ -181,11 +181,20 @@ class AgentRuntime:
 
     async def _run_loop(self) -> None:
         while not self._stopping:
+            self._reclaim_expired_leases()
             request = self.store.lease_next_request(
                 self.settings.agent_id,
                 self.settings.request_lease_ttl_seconds,
             )
             if request is not None:
+                self.activity_manager.log_event(
+                    "request.leased",
+                    {
+                        "request_id": request.request_id,
+                        "lease_owner": request.lease_owner,
+                        "leased_until": request.leased_until,
+                    },
+                )
                 self._current_request_id = request.request_id
                 self._status = AgentStatus.HANDLING_REQUEST
                 self._current_run_task = asyncio.create_task(self._execute_request(request))
@@ -235,6 +244,14 @@ class AgentRuntime:
         self._current_activity_id = activity.activity_id
         self._current_session_id = activity.session_id
         self.store.mark_request_running(request.request_id, activity.activity_id)
+        self.activity_manager.log_event(
+            "request.running",
+            {
+                "request_id": request.request_id,
+                "activity_id": activity.activity_id,
+                "session_id": activity.session_id,
+            },
+        )
         activity = self.store.update_activity(activity.activity_id, status=ActivityStatus.ACTIVE, session_id=activity.session_id)
         checkpoint = self.activity_manager.read_checkpoint(activity)
         prompt = build_prompt_header(self.settings, self.store.get_queue_snapshot(limit=5), activity, checkpoint)
@@ -265,6 +282,10 @@ class AgentRuntime:
         if self._request_cancelled(request.request_id):
             self.store.finalize_cancelled_request(request.request_id)
             self.store.update_activity(activity.activity_id, status=ActivityStatus.FAILED)
+            self.activity_manager.log_event(
+                "request.cancelled",
+                {"request_id": request.request_id, "activity_id": activity.activity_id},
+            )
             self.activity_manager.write_summary(
                 activity,
                 objective=request.summary,
@@ -285,6 +306,15 @@ class AgentRuntime:
                 },
             )
             self.store.update_activity(activity.activity_id, status=ActivityStatus.COMPLETED, session_id=result.session_id)
+            self.activity_manager.log_event(
+                "request.completed",
+                {
+                    "request_id": request.request_id,
+                    "activity_id": activity.activity_id,
+                    "session_id": result.session_id,
+                    "exit_code": result.exit_code,
+                },
+            )
             self.activity_manager.write_summary(
                 activity,
                 objective=request.summary,
@@ -315,6 +345,15 @@ class AgentRuntime:
         if result.recoverable:
             self.store.requeue_request(request.request_id, activity.activity_id)
             self.store.update_activity(activity.activity_id, status=ActivityStatus.PENDING, session_id=result.session_id)
+            self.activity_manager.log_event(
+                "request.requeued",
+                {
+                    "request_id": request.request_id,
+                    "activity_id": activity.activity_id,
+                    "session_id": result.session_id,
+                    "reason": result.error_code or "recoverable_failure",
+                },
+            )
             self.activity_manager.write_summary(
                 activity,
                 objective=request.summary,
@@ -326,6 +365,15 @@ class AgentRuntime:
         else:
             self.store.fail_request(request.request_id, error)
             self.store.update_activity(activity.activity_id, status=ActivityStatus.FAILED, session_id=result.session_id)
+            self.activity_manager.log_event(
+                "request.failed",
+                {
+                    "request_id": request.request_id,
+                    "activity_id": activity.activity_id,
+                    "session_id": result.session_id,
+                    "error_code": error.code,
+                },
+            )
             self.activity_manager.write_summary(
                 activity,
                 objective=request.summary,
