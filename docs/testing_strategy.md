@@ -1,236 +1,201 @@
 # Testing Strategy
 
-## 1. Testing Goals
+## 1. Testing goals
 
-This project needs tests at four levels:
+Production-ready v0 needs proof at four layers:
 
-1. unit tests for internal logic
-2. integration tests for process and storage behavior
-3. end-to-end tests with a fake Codex adapter
-4. live end-to-end tests with the real Codex CLI
+1. static quality gates
+2. unit tests for pure logic and invariants
+3. integration and fake-adapter end-to-end tests
+4. opt-in live tests against the real Codex CLI
 
-The docs must support all four.
+## 2. Release gates
 
-## 2. Test Layers
+The default release gates are:
 
-### 2.1 Unit Tests
+```bash
+uv run ruff check .
+uv run mypy src tests
+uv run pytest tests/unit
+uv run pytest tests/integration
+uv run pytest tests/e2e -m "not live"
+AGENT_LUDENS_RUN_LIVE=1 uv run pytest tests/e2e/test_live_codex.py -m live
+```
+
+Plus one required **Playwright/browser-driven live verification** against a running local
+runtime, with saved browser evidence.
+
+Live verification is required for production sign-off when a real Codex profile is
+available. If the environment blocks it, record the blocker explicitly in release evidence.
+
+## 3. Static quality scope
+
+Static gates must cover the tracked Python surface for production-ready v0:
+
+- `src/`
+- `tests/`
+- any tracked helper scripts that participate in runtime or release flows
+
+## 4. Test layers
+
+### 4.1 Unit tests
 
 Purpose:
 
-- verify pure logic
-- keep feedback fast
+- verify pure logic quickly
+- encode invariants before integration complexity appears
 
-Modules that should have unit coverage:
+Required unit coverage:
 
-- request validation
-- priority ordering
-- lease expiry logic
-- state transitions
-- prompt header construction
+- request validation and idempotency
+- queue ordering
+- lease expiry/reclaim logic
+- prompt-header construction
+- adapter event parsing and error classification
+- namespace / activity mapping
 - checkpoint generation and parsing
-- filesystem path resolution
-- peer request envelope validation
 
-Recommended framework:
+Property-based tests are preferred for queue/store/scheduler invariants.
 
-- `pytest`
-
-### 2.2 Integration Tests
+### 4.2 Integration tests
 
 Purpose:
 
-- verify local components together without real Codex
+- verify the FastAPI runtime, SQLite store, and filesystem work together
+- verify observability surfaces without the real Codex CLI
 
-Integration targets:
+Required integration coverage:
 
-- FastAPI app plus SQLite store
-- supervisor plus scheduler
-- activity manager plus filesystem
-- startup recovery
+- request intake and queue persistence
+- activity detail and summary visibility
 - cancellation transitions
+- peer registration and peer request plumbing
+- recent event surface backed by runtime artifacts
+- supervisor exclusivity / lock behavior
 
-Recommended tools:
-
-- `pytest`
-- `httpx.AsyncClient`
-- temp directories
-- temporary SQLite databases
-
-### 2.3 End-to-End Tests With Fake Codex
+### 4.3 End-to-end tests with fake adapter
 
 Purpose:
 
 - validate the whole control plane deterministically
+- prove recovery, preemption, and failure handling
 
-Approach:
+Required fake-adapter scenarios:
 
-- replace the real Codex adapter with a stub process or test double that emits representative JSONL
-- drive HTTP requests through the public API
-- assert on persisted state and responses
+1. human request happy path
+2. two-runtime peer request happy path using accept+poll semantics
+3. restart recovery with activity/session reuse or documented requeue behavior
+4. free-time preemption
+5. cancellation path
+6. recoverable adapter failure
+7. approval-blocked failure
+8. lease expiry / reclaim path
 
-Fake adapter must simulate:
-
-- fresh thread creation
-- resumed session
-- success
-- recoverable failure
-- approval-blocked failure
-
-### 2.4 Live End-to-End Tests
+### 4.4 Live tests with real Codex
 
 Purpose:
 
-- verify that the real installed Codex CLI works with the runtime contracts
+- verify the installed Codex CLI matches the documented adapter contract
+- prove fresh-turn and resume behavior on a real runtime
 
-These tests should be opt-in because they depend on local Codex availability and permissions.
-They also require a live profile that can complete non-interactive Codex turns without getting
-stuck on fresh approval prompts.
+Required live scenarios:
 
-## 3. Required Scenario Matrix
+1. adapter fresh turn + resume proof
+2. runtime request completion with persisted session id and artifacts
+3. final agreed live peer/runtime proof if the environment supports it
+4. a Playwright/browser-driven live verification path that exercises the running runtime from a browser surface
+
+## 5. Live prerequisites
+
+Live tests are opt-in because they depend on local environment state.
+
+Required prerequisites:
+
+- `AGENT_LUDENS_RUN_LIVE=1`
+- `codex-cli 0.117.0` (or an intentionally updated, re-validated version)
+- a Codex profile that can complete non-interactive turns without new approval prompts
+- clean temporary `.task-memory/` roots for each live test
+- Playwright/browser tooling available for the browser-driven live proof
+
+## 6. Scenario matrix
 
 ### S1. Human request happy path
 
-1. submit request
-2. supervisor leases request
-3. activity folder is created
-4. Codex adapter runs
-5. request completes
+- submit request
+- supervisor leases it
+- activity folder is created
+- Codex adapter runs
+- request reaches terminal success
 
 ### S2. Peer request happy path
 
-1. start Agent A and Agent B
-2. Agent A submits request to Agent B
-3. Agent B completes request
-4. Agent A can inspect the result
+- start Agent A and Agent B
+- Agent A submits to Agent B
+- Agent B returns a remote `request_id`
+- Agent A polls Agent B until terminal success
 
 ### S3. Restart recovery
 
-1. queue request
-2. start activity
-3. force supervisor restart before completion
-4. restart runtime
-5. verify activity resumes or cleanly requeues
+- queue request
+- begin work
+- interrupt runtime
+- restart runtime
+- verify activity is resumed or cleanly requeued per docs
 
 ### S4. Free-time preemption
 
-1. queue no user requests
-2. allow free-time activity to start
-3. submit user request
-4. verify free-time checkpoint happens
-5. user request becomes active next
+- let free-time work start
+- submit a real request
+- verify free-time checkpoint/yield
+- verify queued request runs next
 
 ### S5. Cancellation
 
-1. queue request
-2. start activity
-3. send cancel
-4. verify cancellation is reflected in state and queue records
+- queue request
+- begin work
+- cancel request
+- verify terminal cancellation state and persisted summary/checkpoint behavior
 
-### S6. Approval-blocked path
+### S6. Approval-blocked failure
 
-1. run with a constrained Codex profile or fake approval-blocked adapter
-2. force a blocked action
-3. verify error is persisted and surfaced clearly
+- force approval-blocked adapter behavior
+- verify request failure code, stderr persistence, and inspectable summary
 
-## 4. Test Data And Fixtures
+### S7. Lease expiry / reclaim
 
-Fixtures to provide:
+- create or simulate an expired lease
+- restart or re-run scheduling
+- verify the request becomes reclaimable and runnable again
 
-- temp `.task-memory/` root
-- temporary database
-- fake peer registry
-- fake Codex JSONL transcripts
-- deterministic timestamps when possible
+### S8. Supervisor exclusivity
 
-## 5. Live Test Plan
+- attempt two runtimes against one `.task-memory/` root
+- verify only one acquires the supervisor lock
 
-Live tests should use fixed local ports and clean temp roots.
+### S9. Observability
 
-Example topology:
+- verify runtime state files exist and remain coherent
+- verify recent events are visible via file/API surfaces
+- verify activity summary/checkpoint artifacts explain the next action
 
-- Agent A: `127.0.0.1:7101`
-- Agent B: `127.0.0.1:7102`
+### S10. Browser-driven live verification
 
-### Live Test LT-1
+- start a real local runtime
+- use Playwright to exercise the browser-accessible operator surface
+- capture evidence that the runtime is reachable and returns live state through the browser path
 
-Goal:
+## 7. Evidence checklist
 
-- verify one request can pass through the real Codex adapter
+Release evidence should include:
 
-Steps:
+- command outputs for each release gate
+- one completed activity folder containing `state.json`, `summary.md`, `checkpoint.json`, and Codex artifacts
+- proof of peer accept+poll behavior with two runtimes
+- proof of supervisor exclusivity and lease reclaim behavior
+- confirmation that docs and actual commands match
+- saved browser evidence for the Playwright/browser-driven live proof
 
-1. start runtime with clean `.task-memory/`
-2. `POST /v1/requests`
-3. poll `GET /v1/requests/{id}`
-4. inspect activity folder and Codex logs
+## 8. Deferred testing work
 
-Pass criteria:
-
-- request completes
-- session id is captured
-- summary and checkpoint files exist
-
-### Live Test LT-2
-
-Goal:
-
-- verify `resume` path
-
-Steps:
-
-1. start request that creates an activity
-2. stop runtime after first turn or checkpoint
-3. restart runtime
-4. verify adapter uses resume path
-
-Pass criteria:
-
-- same activity continues
-- stored `session_id` is reused
-
-### Live Test LT-3
-
-Goal:
-
-- verify peer-to-peer request flow
-
-Steps:
-
-1. start two runtimes
-2. submit peer request from A to B
-3. confirm B handles it and A can inspect outcome
-
-## 6. Suggested Test Commands
-
-These are target commands for future implementation:
-
-```bash
-pytest tests/unit
-pytest tests/integration
-pytest tests/e2e -m "not live"
-pytest tests/e2e -m live
-```
-
-Marker suggestions:
-
-- `unit`
-- `integration`
-- `e2e`
-- `live`
-- `codex_real`
-
-## 7. Release Gates
-
-V0 should not be considered complete until:
-
-1. unit tests cover scheduler, persistence, and adapter parsing
-2. integration tests cover queueing and recovery
-3. fake-adapter e2e tests cover all required scenarios
-4. at least one live test passes with the real installed Codex CLI
-
-## 8. Test Acceptance Criteria
-
-The testing strategy is sufficient if a future agent can implement:
-
-- code-level tests without guessing the intended scenarios
-- live tests without inventing new behavior contracts
+Browser/UI tests and marketplace tests are explicitly deferred because those product surfaces
+are not part of production-ready v0.

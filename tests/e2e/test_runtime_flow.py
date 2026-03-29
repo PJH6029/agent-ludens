@@ -1,18 +1,30 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
 from agent_ludens.adapters import FakeCodexAdapter
 from agent_ludens.app import create_app
+from agent_ludens.config import AgentSettings
+from agent_ludens.models import (
+    PeerRecord,
+    ReplyTarget,
+    RequestCreate,
+    RequestKind,
+    RequestSource,
+    RequestStatus,
+)
+from agent_ludens.peer_client import PeerClient
 from agent_ludens.supervisor import AgentRuntime
 from tests.helpers import wait_for_request_completion
 
 
 @pytest.mark.asyncio
-async def test_human_request_happy_path(runtime_client) -> None:
+async def test_human_request_happy_path(runtime_client: tuple[AgentRuntime, AsyncClient]) -> None:
     runtime, client = runtime_client
     response = await client.post(
         "/v1/requests",
@@ -38,30 +50,87 @@ async def test_human_request_happy_path(runtime_client) -> None:
 
 
 @pytest.mark.asyncio
-async def test_peer_request_happy_path(runtime_client) -> None:
-    _, client = runtime_client
-    response = await client.post(
-        "/v1/requests",
-        json={
-            "kind": "agent_task",
-            "priority": 60,
-            "source": {
-                "type": "agent",
-                "id": "planner-7102",
-                "reply_to": {"base_url": "http://127.0.0.1:7102", "request_id": "req_origin_123"},
-            },
-            "summary": "Write a peer response",
-            "details": {"instructions": "Return a structured acknowledgement."},
-        },
+async def test_peer_request_happy_path(
+    settings_factory: Callable[..., AgentSettings],
+    tmp_path: Path,
+) -> None:
+    sender_settings = settings_factory(
+        agent_id="planner-7101",
+        role="planner",
+        port=7101,
+        enable_supervisor=False,
+        task_memory_root=tmp_path / ".task-memory-sender",
     )
-    request_id = response.json()["request_id"]
-    request_detail = await wait_for_request_completion(client, request_id)
-    assert request_detail["status"] == "completed"
-    assert request_detail["source"]["type"] == "agent"
+    receiver_settings = settings_factory(
+        agent_id="writer-7102",
+        role="writer",
+        port=7102,
+        enable_free_time=False,
+        task_memory_root=tmp_path / ".task-memory-receiver",
+    )
+
+    sender_runtime = AgentRuntime(sender_settings, adapter=FakeCodexAdapter())
+    receiver_runtime = AgentRuntime(receiver_settings, adapter=FakeCodexAdapter())
+    sender_app = create_app(settings=sender_settings, runtime=sender_runtime)
+    receiver_app = create_app(settings=receiver_settings, runtime=receiver_runtime)
+
+    await sender_runtime.start()
+    await receiver_runtime.start()
+    try:
+        async with AsyncClient(transport=ASGITransport(app=sender_app), base_url="http://sender.test") as sender_client:
+            peer_registration = await sender_client.post(
+                "/v1/peers",
+                json={
+                    "agent_id": receiver_settings.agent_id,
+                    "role": receiver_settings.role,
+                    "base_url": "http://receiver.test",
+                    "token": None,
+                },
+            )
+            assert peer_registration.status_code == 201
+            peers_response = await sender_client.get("/v1/peers")
+            peer = PeerRecord.model_validate(peers_response.json()[0])
+
+        peer_client = PeerClient(transport_factory=lambda: ASGITransport(app=receiver_app))
+        accepted = await peer_client.send_request(
+            peer,
+            RequestCreate(
+                kind=RequestKind.AGENT_TASK,
+                priority=60,
+                source=RequestSource(
+                    type="agent",
+                    id=sender_settings.agent_id,
+                    reply_to=ReplyTarget(
+                        base_url="http://sender.test",
+                        request_id="req_origin_123",
+                    ),
+                ),
+                summary="Write a peer response",
+                details={"instructions": "Return a structured acknowledgement."},
+            ),
+        )
+
+        assert accepted.status == RequestStatus.QUEUED
+
+        request_detail = await peer_client.wait_for_completion(peer, accepted.request_id, timeout_seconds=5.0)
+
+        assert request_detail.status == RequestStatus.COMPLETED
+        assert request_detail.source.type == "agent"
+        assert request_detail.source.id == sender_settings.agent_id
+        assert request_detail.source.reply_to is not None
+        assert request_detail.source.reply_to.request_id == "req_origin_123"
+        assert request_detail.result is not None
+        assert request_detail.result["message"] == "Completed: Write a peer response"
+        assert request_detail.result["session_id"] == f"fake-session-{request_detail.activity_id}"
+    finally:
+        await receiver_runtime.shutdown()
+        await sender_runtime.shutdown()
 
 
 @pytest.mark.asyncio
-async def test_restart_recovery_requeues_and_reuses_activity(settings_factory) -> None:
+async def test_restart_recovery_requeues_and_reuses_activity(
+    settings_factory: Callable[..., AgentSettings],
+) -> None:
     settings = settings_factory(enable_supervisor=True, enable_free_time=False)
     runtime = AgentRuntime(settings, adapter=FakeCodexAdapter())
     app = create_app(settings=settings, runtime=runtime)
@@ -104,7 +173,7 @@ async def test_restart_recovery_requeues_and_reuses_activity(settings_factory) -
 
 
 @pytest.mark.asyncio
-async def test_free_time_preemption(settings_factory) -> None:
+async def test_free_time_preemption(settings_factory: Callable[..., AgentSettings]) -> None:
     settings = settings_factory(enable_supervisor=True, enable_free_time=True, free_time_delay_seconds=0.25)
     runtime = AgentRuntime(settings, adapter=FakeCodexAdapter())
     app = create_app(settings=settings, runtime=runtime)
@@ -141,7 +210,9 @@ async def test_free_time_preemption(settings_factory) -> None:
 
 
 @pytest.mark.asyncio
-async def test_approval_blocked_failure_is_surfaced(runtime_client) -> None:
+async def test_approval_blocked_failure_is_surfaced(
+    runtime_client: tuple[AgentRuntime, AsyncClient],
+) -> None:
     _, client = runtime_client
     response = await client.post(
         "/v1/requests",

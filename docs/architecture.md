@@ -1,233 +1,188 @@
 # Architecture
 
-## 1. Top-Level Design
+## 1. Top-level design
 
 Agent Ludens is a local supervisor system around Codex.
 
 ```mermaid
 flowchart TD
-    A[Human CLI Client] --> B[HTTP API Listener]
-    C[Peer Agent] --> B
-    B --> D[Request Store]
-    D --> E[Supervisor Loop]
-    E --> F[Scheduler]
-    E --> G[Activity Manager]
-    E --> H[Codex Adapter]
-    G --> I[".task-memory/"]
-    H --> J[Codex CLI]
-    H --> I
+    A[Human operator or peer agent] --> B[FastAPI loopback API]
+    B --> C[SQLite request/activity store]
+    C --> D[Supervisor loop]
+    D --> E[Activity manager]
+    D --> F[Codex adapter]
+    E --> G[.task-memory/ activity folders]
+    E --> H[.task-memory/runtime/ state + events]
+    F --> I[Codex CLI]
+    B --> J[Peer registry + peer client]
 ```
 
-## 2. Major Components
+## 2. Major components
 
-### 2.1 API Listener
-
-Responsibilities:
-
-- expose loopback HTTP endpoints
-- validate incoming payloads
-- persist accepted requests
-- expose status and inspection endpoints
-
-Technology choice for v0:
-
-- FastAPI
-- Uvicorn
-- Pydantic
-
-### 2.2 Request Store
+### 2.1 API listener
 
 Responsibilities:
 
-- durable queue state
-- leases and status transitions
+- expose loopback-only HTTP endpoints
+- validate payloads and auth headers
+- persist requests before returning `202 Accepted`
+- expose read-only status, activity, peer, and event inspection endpoints
+
+### 2.2 SQLite store
+
+Responsibilities:
+
+- durable request state machine
+- durable activity metadata
 - idempotent request insertion
+- request event history
+- peer registry
+- lease ownership + expiry metadata
 
-Technology choice for v0:
+### 2.3 Activity manager
 
-- SQLite for queue and indexes
-- JSON files for human-readable mirrors when useful
+Responsibilities:
 
-### 2.3 Supervisor Loop
+- create activity folders and scaffold files
+- write `state.json`, `summary.md`, `checkpoint.json`, and `inbox.md`
+- persist Codex artifacts under `.task-memory/codex/`
+- maintain runtime state files and event log
+- maintain `session_map.json`
+
+### 2.4 Supervisor loop
 
 Responsibilities:
 
 - own the single active execution slot
-- pick the next request or free-time activity
-- manage state transitions
-- coordinate recovery after restart
+- choose the next runnable request or free-time quantum
+- manage checkpointing, cancellation, and recovery
+- respect lease reclaim and exclusivity rules
 
-There must be exactly one supervisor loop per agent instance.
-
-### 2.4 Scheduler
+### 2.5 Codex adapter
 
 Responsibilities:
 
-- choose the next runnable activity
-- prefer request-driven work over free-time work
-- enforce preemption rules
+- run `codex exec --json <prompt>` for fresh turns
+- run `codex exec resume <session_id> --json <prompt>` for resumed turns
+- parse JSONL events
+- capture session id, final message, stderr, exit code, and approval-blocked failures
 
-### 2.5 Activity Manager
-
-Responsibilities:
-
-- create activity folders
-- maintain summaries and checkpoints
-- bind activities to Codex session ids
-- expose current activity state
-
-### 2.6 Codex Adapter
+### 2.6 Peer client
 
 Responsibilities:
 
-- start fresh Codex work with `codex exec --json`
-- continue work with `codex exec resume --json`
-- stream and parse JSONL events
-- extract last assistant message, errors, and thread ids
-- persist adapter logs for recovery and debugging
+- submit requests to peer runtimes over loopback HTTP
+- carry auth token when configured
+- support the submit + poll contract
 
-### 2.7 Peer Client
+### 2.7 Observability surface
 
 Responsibilities:
 
-- send structured requests to peer agents
-- retry or fail cleanly
-- preserve correlation ids and reply references
+- keep runtime state visible in `.task-memory/runtime/`
+- keep activity summaries/checkpoints visible in activity folders
+- surface recent runtime events through a minimal read-only API
 
-## 3. Process Model
+## 3. Process model
 
-V0 should run as one OS process tree with two long-lived roles:
+Production-ready v0 targets one Python process tree per runtime root:
 
-- API server
-- supervisor
+- FastAPI listener
+- one supervisor background task
+- zero or one active Codex subprocess at a time
 
-The API server and supervisor may run:
+The preferred shape remains one Python process with explicit startup/shutdown hooks.
 
-- in one Python process with background tasks, or
-- as two coordinated Python processes
+## 4. Supervisor exclusivity
 
-Preferred v0 choice:
+A concrete local supervisor lock is required. The lock must:
 
-- one Python process with explicit startup and shutdown hooks
-- one internal scheduler task
-- one explicit file lock to prevent double-supervisor startup
+- live under `.task-memory/runtime/supervisor.lock`
+- prevent two runtimes from owning the same persistence root at once
+- be acquired before scheduling work
+- be released on clean shutdown
+- be tested with a double-start / contention scenario
 
-## 4. Runtime Decision: Use Codex CLI First
-
-The primary integration path for v0 is the installed Codex CLI:
-
-- `codex exec --json`
-- `codex exec resume --json`
-
-Why:
-
-- machine-readable stream is available today
-- session resumption is supported
-- lower surface area than adopting the experimental `codex mcp-server` control API first
-
-Deferred option:
-
-- introduce an alternate adapter later for `codex mcp-server`
-
-## 5. Request Lifecycle
+## 5. Request lifecycle
 
 ```mermaid
 stateDiagram-v2
     [*] --> queued
     queued --> leased: supervisor claims request
-    leased --> running: activity starts
-    running --> checkpointing: safe switch or shutdown
-    checkpointing --> queued: requeue remaining work
+    leased --> running: activity becomes active
+    running --> checkpointing: shutdown or explicit checkpoint
+    checkpointing --> queued: resume later
     running --> completed
     running --> failed
     queued --> cancelled
-    leased --> cancelled
+    leased --> cancellation_requested
+    running --> cancellation_requested
+    cancellation_requested --> cancelled
 ```
 
-Notes:
+Lease metadata must reflect a real TTL. Reclaiming an expired lease is part of normal
+recovery and scheduling behavior.
 
-- `leased` prevents duplicate execution.
-- `checkpointing` is a first-class state because task switching is core behavior.
+## 6. Activity model
 
-## 6. Activity Model
+Every unit of work is an activity. Shared rules:
 
-Every unit of work is an activity.
-
-Activity classes:
-
-- request activity
-- preparation activity
-- community activity
-- maintenance activity
-
-Shared rules:
-
-- only one activity is active at a time
+- only one activity may actively drive Codex at a time
 - every activity has a durable folder
-- every activity has a machine-readable state file
-- every activity has a compact human-readable summary
+- request-driven and free-time activities share the same persistence contract
+- existing `activity_id` values are reused when a request resumes after requeue
 
-## 7. Concurrency Model
+## 7. Scheduling model
 
-### Hard rule
+Priority order:
 
-Only one active Codex turn may exist at a time for one agent instance.
+1. recoverable queued work that already has an activity/checkpoint
+2. newly queued human or peer requests by priority
+3. free-time work when the queue is empty
 
-### Allowed concurrency
+Free-time work must run in one-turn quanta and yield back to the scheduler after each turn.
 
-- HTTP requests can arrive concurrently
-- persistence writes can occur concurrently if serialized safely
-- queue inspection can happen while an activity is running
+## 8. Recovery model
 
-### Disallowed concurrency
+On startup the supervisor must:
 
-- two simultaneous active activities driving Codex
-- concurrent mutation of the same activity state without locking
+1. acquire the supervisor lock
+2. inspect request rows for leased/running/checkpointing state
+3. reclaim expired leases and normalize interrupted work
+4. inspect activity folders for incomplete state
+5. rebuild runtime state and continue scheduling
 
-## 8. Locking Strategy
+Recovery should prefer reusing an existing `activity_id` and `session_id` when the
+persisted checkpoint still matches the request.
 
-V0 should use simple local locking:
+## 9. Observability model
 
-- one supervisor lock file
-- SQLite transactional writes for queue updates
-- per-activity write serialization inside the process
+Canonical observability artifacts are:
 
-Do not introduce distributed locking in v0.
+- `.task-memory/runtime/agent_state.json`
+- `.task-memory/runtime/scheduler_state.json`
+- `.task-memory/runtime/event-log.jsonl`
+- activity `summary.md` and `checkpoint.json`
+- `.task-memory/codex/<activity_id>/latest.jsonl`
+- `.task-memory/codex/<activity_id>/last_message.txt`
+- `.task-memory/codex/<activity_id>/stderr.log`
 
-## 9. Failure Recovery
+A minimal read-only API should expose recent events without requiring private SQLite access.
 
-On startup:
+## 10. Security posture
 
-1. acquire supervisor lock
-2. open queue store
-3. inspect active or leased requests
-4. inspect activity folders for incomplete states
-5. reconcile and choose one recovery path
+Production-ready v0 stays intentionally narrow:
 
-Recovery rules:
-
-- if an activity has a persisted `session_id`, prefer resume
-- if activity exists without safe resume metadata, restore from checkpoint summary
-- if a request was leased but no activity was created, return it to queue
-
-## 10. Security Model
-
-V0 security posture is intentionally narrow:
-
-- bind HTTP only to loopback
-- no external exposure
-- optional local shared-secret header for peer calls
+- bind only to `127.0.0.1`
+- optional shared-secret auth via `X-Agent-Token`
 - reject unknown payload shapes
+- do not expose the runtime publicly
 
-This is not a hardened multi-user system yet.
+## 11. Deferred architecture work
 
-## 11. Deferred Architecture Decisions
+The following are explicitly outside the v0 architecture:
 
-These are explicitly out of scope for v0:
-
-- remote peer discovery
-- cluster scheduling
-- websocket streaming protocol
-- durable event bus
-- plugin sandboxing
-- multiple simultaneous Codex workers
+- frontend/server split for an owner UI
+- registry/marketplace services
+- multi-machine discovery or networking
+- token settlement systems

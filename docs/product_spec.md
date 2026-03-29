@@ -2,91 +2,88 @@
 
 ## 1. Purpose
 
-Agent Ludens is a long-running local agent runtime built on top of Codex.
-Its job is to keep one role-based agent alive on a machine, accept requests from humans or
-peer agents, handle them one at a time with durable context, and use idle time productively.
+Agent Ludens is a long-running local runtime built on top of Codex. Its job is to keep one
+role-based agent alive on one machine, accept structured requests, execute them one at a
+time with durable state, and use idle time productively.
 
-## 2. Problem Statement
+## 2. Production-ready v0 boundary
 
-Current Codex workflows are excellent for a focused task, but they are usually session-shaped:
+Production-ready v0 is the **Stage 1 local control plane only**.
 
-- a user opens a session
-- a task is done
-- the session ends
+Included:
 
-That model is weak for "always-on agent" behavior:
+- loopback-only HTTP API
+- durable request queue and activity state
+- single-slot supervisor and free-time scheduler
+- Codex CLI fresh-turn and resume integration
+- local peer-to-peer request submission using accept+poll semantics
+- release-grade observability and verification gates
 
-- work has to be restarted manually
-- idle time is unused
-- switching between tasks is fragile
-- agent-to-agent requests need ad hoc plumbing
+Deferred:
 
-Agent Ludens should provide the missing control plane.
+- owner web UI or dashboard
+- frontend event feed
+- marketplace / job board / delegation economy
+- token economics
+- multi-machine networking or internet exposure
 
-## 3. Product Goals
+## 3. Problem statement
+
+Raw Codex sessions are excellent for focused work, but they are usually session-shaped:
+
+- a session starts for one task
+- the task ends or stalls
+- durable runtime state is left to ad hoc notes or memory
+
+Agent Ludens provides the missing control plane for always-on local agent behavior:
+
+- requests survive restarts
+- work can be resumed safely
+- idle time can be used productively
+- peer requests use a documented local contract
+
+## 4. Product goals
 
 ### G1. Always-on local agent
 
-An agent should run continuously in the background and be reachable through a local API.
+The agent runtime should run continuously in the background and be reachable through a
+loopback API.
 
 ### G2. Single durable working context
 
-The agent should keep one logical working context active at a time, even across restarts.
+The runtime should maintain one logical active activity at a time, even across restarts.
 
 ### G3. Safe task switching
 
-The agent should be able to switch between requests without losing the state needed to resume.
+The runtime should checkpoint enough state to requeue or resume work without guessing.
 
 ### G4. Productive idle behavior
 
-When no requests are waiting, the agent should do low-priority free-time work such as:
-
-- preparation
-- literature review
-- workspace cleanup
-- community-facing activity
+When no real requests are queued, the runtime may spend one quantum on approved
+free-time work.
 
 ### G5. Peer-to-peer local requests
 
-Agents should be able to send requests to each other using loopback HTTP in v0.
+One local runtime should be able to submit work to another local runtime via HTTP and poll
+for the result.
 
-## 4. Non-Goals For V0
+## 5. Users and surfaces
 
-- distributed networking across multiple machines
-- internet-exposed APIs
-- multi-tenant auth
-- multiple simultaneous Codex task contexts within one agent instance
-- human-grade GUI
-- arbitrary plugin execution
-- full Codex MCP server integration as the primary control path
+### User A: human operator
 
-## 5. Users And Surfaces
+Uses HTTP directly or through a thin wrapper to submit, inspect, and cancel work.
 
-### User Type A: Human operator
+### User B: peer agent
 
-The human interacts through a CLI-like client that forwards requests to the agent's local API.
+Submits a structured request to another runtime and polls for terminal status.
 
-### User Type B: Peer agent
+### User C: maintainer / future agent
 
-Another agent sends structured requests directly via HTTP.
+Inspects docs, `.task-memory/`, and test evidence to understand or extend the runtime.
 
-### User Type C: Local maintainer
+## 6. Functional requirements
 
-A developer or future agent works on the runtime itself and needs stable specs for planning,
-implementation, tests, and live validation.
-
-## 6. V0 Product Shape
-
-Each machine runs one agent process group:
-
-- one API listener
-- one supervisor loop
-- zero or one active Codex subprocess at a time
-- one persistence root under `.task-memory/`
-
-## 7. Functional Requirements
-
-### FR-1. Agent identity
+### FR-1. Agent identity and status
 
 The runtime must expose:
 
@@ -94,160 +91,175 @@ The runtime must expose:
 - `role`
 - `port`
 - `status`
-- `current_activity_id` if any
+- `active_activity_id` if any
+- `current_session_id` if any
+- queue depth summary
 
 ### FR-2. Request intake
 
 The runtime must accept structured requests with:
 
-- unique request id
-- source metadata
-- summary
-- details payload
-- priority
-- desired reply mode
-- optional deadline
+- `kind`
+- `priority`
+- `source`
+- `summary`
+- `details`
+- optional `reply`, `deadline`, `idempotency_key`, `namespace_hint`, `activity_id`
 
-### FR-3. Request queueing
+Request acceptance must persist before the API returns success.
 
-Requests must be persisted before execution starts.
+### FR-3. Durable queueing
 
-The queue must support:
+Requests must be durably persisted in SQLite and support:
 
 - enqueue
-- lease by supervisor
+- lease
+- running
 - completion
 - failure
 - cancellation
-- retry metadata
+- requeue / checkpoint continuation
+- idempotent insert by key + payload
 
-### FR-4. Single active execution
+### FR-4. Lease semantics
 
-Only one request or free-time activity may actively drive Codex at a time.
+Request leasing must use a real TTL model:
 
-### FR-5. Filesystem-backed activity state
+- `leased_until` is written as `now + TTL`
+- lease ownership is visible in request detail
+- expired leases are reclaimable on startup and before new leasing decisions
+- tests prove lease reclaim behavior
 
-Every activity must have a persisted folder containing:
+### FR-5. Single active execution slot
 
-- machine-readable state
-- human-readable summary
-- artifacts
-- checkpoint data
+Only one request-driven or free-time activity may actively drive Codex per runtime.
+Supervisor exclusivity must be enforced by a concrete local lock for the selected
+`.task-memory/` root.
 
-### FR-6. Resume support
+### FR-6. Filesystem-backed activity state
 
-If the process crashes or restarts, the supervisor must be able to reconstruct:
+Every activity must have a folder containing:
 
-- the active activity
-- the linked Codex session id if one exists
-- the next safe action
+- `state.json`
+- `summary.md`
+- `checkpoint.json`
+- `inbox.md`
+- `artifacts/`
+- `logs/`
 
-### FR-7. Free-time mode
+### FR-7. Resume and recovery
 
-When the request queue is empty, the scheduler may run free-time activities from approved classes:
+After shutdown or crash, the supervisor must reconstruct:
+
+- queued and leased request state
+- activity state
+- stored Codex session id, if any
+- next safe action from the persisted checkpoint
+
+### FR-8. Codex adapter
+
+Production-ready v0 uses the Codex CLI as the primary adapter surface:
+
+- `codex exec --json <prompt>`
+- `codex exec resume <session_id> --json <prompt>`
+
+The runtime must persist raw JSONL, final message, stderr, exit code, and session id.
+
+### FR-9. Human operator surface
+
+The normative human surface is HTTP-first. A GUI or rich CLI wrapper is not required for
+production-ready v0.
+
+### FR-10. Peer request contract
+
+Peer request handling must support **accept + poll** semantics:
+
+1. Agent A submits `POST /v1/requests` to Agent B.
+2. Agent B returns `202 Accepted` with a remote `request_id`.
+3. Agent A polls `GET /v1/requests/{request_id}` on Agent B until terminal.
+
+`source.reply_to` may be carried for correlation, but callback delivery is not required.
+
+### FR-11. Free-time work
+
+When no real requests are queued, the runtime may run one free-time quantum in one of the
+approved namespaces:
 
 - `preparation`
 - `community`
 - `maintenance`
 
-### FR-8. Preemption
+Free-time work must yield after each quantum so the queue can be re-checked.
 
-Free-time work must stop or checkpoint promptly when a real request arrives.
+### FR-12. Preemption and cancellation
 
-### FR-9. Peer agent communication
+- free-time work must checkpoint and yield promptly when a real request arrives
+- request-driven work is only interrupted for cancellation or shutdown in v0
+- cancellation status must be visible through the public API and persisted state
 
-An agent must be able to send a structured request to another local agent by HTTP.
+### FR-13. Observability
 
-### FR-10. Observability
+Operators and maintainers must be able to inspect:
 
-The system must provide machine-readable status and logs for:
+- current runtime status
+- queued/running request state
+- activity summaries and checkpoints
+- recent runtime events
+- Codex artifacts and stderr
 
-- current queue
-- current activity
-- recent events
-- Codex adapter outcome
+The canonical observability surfaces are the `.task-memory/runtime/` files, activity
+folders, and the read-only API endpoints described in [API Spec](./api_spec.md).
 
-## 8. Non-Functional Requirements
+## 7. Non-functional requirements
 
 ### NFR-1. Local-first
 
-V0 must work entirely on one machine with loopback networking.
+v0 must work entirely on one machine with loopback networking.
 
 ### NFR-2. Restart safety
 
-Process death must not destroy task state.
+Process death must not destroy accepted requests or the state needed to resume work.
 
 ### NFR-3. Explainability
 
-A future agent must be able to inspect the persisted state and understand what happened.
+A future agent or maintainer must be able to inspect persisted files and understand what
+happened without relying on chat history.
 
-### NFR-4. Deterministic scheduling
+### NFR-4. Explicit scheduling
 
-The rules for when free-time work runs and when it is preempted must be explicit.
+Queue priority, free-time eligibility, and checkpoint behavior must be documented and
+testable.
 
 ### NFR-5. Controlled Codex usage
 
-The Codex adapter must use a stable, documented integration path rather than hidden UI behavior.
+The runtime must use a documented Codex CLI integration path, not hidden UI automation.
 
-## 9. Key Product Decisions
+### NFR-6. Release proof
 
-### Decision A. Codex adapter choice
+Production-ready claims require passing lint, typecheck, non-live tests, and the agreed
+live verification path or recording an explicit live-environment blocker.
 
-V0 uses `codex exec --json` and `codex exec resume --json` as the main adapter.
+## 8. Acceptance criteria
 
-Rationale:
+Production-ready v0 is complete when all of the following are true:
 
-- available in the installed CLI
-- machine-readable output
-- stable enough for automation
-- lower complexity than adopting the experimental MCP control surface first
+1. the docs describe one unambiguous Stage 1-only contract
+2. loopback request handling, activity persistence, recovery, and peer accept+poll work
+3. supervisor exclusivity and lease reclaim behavior are implemented and tested
+4. recent runtime state and events are inspectable through documented file/API surfaces
+5. the release gates in [Release Checklist](./release_checklist.md) pass or any blocker is
+   explicitly documented
 
-### Decision B. Persistence model
+## 9. Release posture
 
-The canonical state is the filesystem plus SQLite, not raw Codex transcript history.
+Production-ready v0 is **API-first, single-machine, and operator-visible**. It should be
+shippable for local use without Stage 2/3 work.
 
-### Decision C. Scheduler model
+## 10. Deferred roadmap
 
-All work is represented as activities. Request-driven activities outrank free-time activities.
+Stage 2 and Stage 3 ideas remain valuable, but they are follow-on work after v0 ship:
 
-## 10. Acceptance Criteria
-
-### AC-1. Human request path
-
-A human can send a request to the local API and receive a persisted request id plus eventual result.
-
-### AC-2. Peer request path
-
-Agent A can send a request to Agent B on another loopback port and receive a structured reply.
-
-### AC-3. Resume after restart
-
-If the supervisor stops mid-activity and restarts, it can reload the active activity and continue.
-
-### AC-4. Free-time preemption
-
-The agent stops or checkpoints idle work when a real request is queued.
-
-### AC-5. Visible state
-
-A maintainer can inspect the queue, activity state, and recent event logs without reading raw model history.
-
-## 11. Success Metrics For V0
-
-- no request loss after accepted enqueue
-- no more than one active Codex turn at a time
-- restart recovery succeeds for representative interrupted scenarios
-- live end-to-end tests pass for:
-  - human to agent request
-  - agent to agent request
-  - free-time preemption
-  - resumed work after restart
-
-## 12. Future Work After V0
-
-- remote machine networking
-- stronger auth
-- richer peer discovery
-- task dependency graphs
-- multiple Codex workers per machine
-- migration to Codex MCP server if it proves more robust than CLI subprocess control
+- owner web interface
+- richer live event GUI
+- marketplace / delegation economy
+- tokens, wallets, reputation ledger

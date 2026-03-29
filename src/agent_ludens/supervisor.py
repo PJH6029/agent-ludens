@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import os
 from itertools import cycle
 from pathlib import Path
 from typing import Any
@@ -63,17 +65,24 @@ class AgentRuntime:
         self._current_activity_id: str | None = None
         self._current_session_id: str | None = None
         self._current_run_task: asyncio.Task[None] | None = None
+        self._supervisor_lock_held = False
         self._free_time_cycle = cycle(
             [Namespace.PREPARATION, Namespace.COMMUNITY, Namespace.MAINTENANCE]
         )
 
     async def start(self) -> None:
         self.activity_manager.ensure_layout()
-        self._recover_state()
-        await self._write_runtime_state()
-        if self.settings.enable_supervisor and self._loop_task is None:
-            self._stopping = False
-            self._loop_task = asyncio.create_task(self._run_loop())
+        try:
+            if self.settings.enable_supervisor:
+                self._acquire_supervisor_lock()
+            self._recover_state()
+            await self._write_runtime_state()
+            if self.settings.enable_supervisor and self._loop_task is None:
+                self._stopping = False
+                self._loop_task = asyncio.create_task(self._run_loop())
+        except Exception:
+            self._release_supervisor_lock()
+            raise
 
     async def shutdown(self) -> None:
         self._stopping = True
@@ -89,6 +98,7 @@ class AgentRuntime:
             self._loop_task = None
         self._status = AgentStatus.IDLE
         await self._write_runtime_state()
+        self._release_supervisor_lock()
 
     def wakeup(self) -> None:
         self._wakeup.set()
@@ -144,6 +154,9 @@ class AgentRuntime:
             updated_at=activity.updated_at,
         )
 
+    def list_recent_events(self, *, limit: int = 50) -> list[dict[str, Any]]:
+        return self.activity_manager.read_recent_events(limit=limit)
+
     def _read_text(self, path: str) -> str:
         return Path(path).read_text(encoding="utf-8")
 
@@ -168,11 +181,20 @@ class AgentRuntime:
 
     async def _run_loop(self) -> None:
         while not self._stopping:
+            self._reclaim_expired_leases()
             request = self.store.lease_next_request(
                 self.settings.agent_id,
                 self.settings.request_lease_ttl_seconds,
             )
             if request is not None:
+                self.activity_manager.log_event(
+                    "request.leased",
+                    {
+                        "request_id": request.request_id,
+                        "lease_owner": request.lease_owner,
+                        "leased_until": request.leased_until,
+                    },
+                )
                 self._current_request_id = request.request_id
                 self._status = AgentStatus.HANDLING_REQUEST
                 self._current_run_task = asyncio.create_task(self._execute_request(request))
@@ -222,6 +244,14 @@ class AgentRuntime:
         self._current_activity_id = activity.activity_id
         self._current_session_id = activity.session_id
         self.store.mark_request_running(request.request_id, activity.activity_id)
+        self.activity_manager.log_event(
+            "request.running",
+            {
+                "request_id": request.request_id,
+                "activity_id": activity.activity_id,
+                "session_id": activity.session_id,
+            },
+        )
         activity = self.store.update_activity(activity.activity_id, status=ActivityStatus.ACTIVE, session_id=activity.session_id)
         checkpoint = self.activity_manager.read_checkpoint(activity)
         prompt = build_prompt_header(self.settings, self.store.get_queue_snapshot(limit=5), activity, checkpoint)
@@ -252,6 +282,10 @@ class AgentRuntime:
         if self._request_cancelled(request.request_id):
             self.store.finalize_cancelled_request(request.request_id)
             self.store.update_activity(activity.activity_id, status=ActivityStatus.FAILED)
+            self.activity_manager.log_event(
+                "request.cancelled",
+                {"request_id": request.request_id, "activity_id": activity.activity_id},
+            )
             self.activity_manager.write_summary(
                 activity,
                 objective=request.summary,
@@ -272,6 +306,15 @@ class AgentRuntime:
                 },
             )
             self.store.update_activity(activity.activity_id, status=ActivityStatus.COMPLETED, session_id=result.session_id)
+            self.activity_manager.log_event(
+                "request.completed",
+                {
+                    "request_id": request.request_id,
+                    "activity_id": activity.activity_id,
+                    "session_id": result.session_id,
+                    "exit_code": result.exit_code,
+                },
+            )
             self.activity_manager.write_summary(
                 activity,
                 objective=request.summary,
@@ -302,6 +345,15 @@ class AgentRuntime:
         if result.recoverable:
             self.store.requeue_request(request.request_id, activity.activity_id)
             self.store.update_activity(activity.activity_id, status=ActivityStatus.PENDING, session_id=result.session_id)
+            self.activity_manager.log_event(
+                "request.requeued",
+                {
+                    "request_id": request.request_id,
+                    "activity_id": activity.activity_id,
+                    "session_id": result.session_id,
+                    "reason": result.error_code or "recoverable_failure",
+                },
+            )
             self.activity_manager.write_summary(
                 activity,
                 objective=request.summary,
@@ -313,6 +365,15 @@ class AgentRuntime:
         else:
             self.store.fail_request(request.request_id, error)
             self.store.update_activity(activity.activity_id, status=ActivityStatus.FAILED, session_id=result.session_id)
+            self.activity_manager.log_event(
+                "request.failed",
+                {
+                    "request_id": request.request_id,
+                    "activity_id": activity.activity_id,
+                    "session_id": result.session_id,
+                    "error_code": error.code,
+                },
+            )
             self.activity_manager.write_summary(
                 activity,
                 objective=request.summary,
@@ -326,9 +387,22 @@ class AgentRuntime:
         if cancelled:
             self.store.finalize_cancelled_request(request.request_id)
             self.store.update_activity(activity.activity_id, status=ActivityStatus.FAILED)
+            self.activity_manager.log_event(
+                "request.cancelled",
+                {"request_id": request.request_id, "activity_id": activity.activity_id},
+            )
             return
         self.store.requeue_request(request.request_id, activity.activity_id)
         self.store.update_activity(activity.activity_id, status=ActivityStatus.PENDING)
+        self.activity_manager.log_event(
+            "request.requeued",
+            {
+                "request_id": request.request_id,
+                "activity_id": activity.activity_id,
+                "session_id": activity.session_id,
+                "reason": "checkpoint",
+            },
+        )
         self.activity_manager.write_summary(
             activity,
             objective=request.summary,
@@ -456,6 +530,74 @@ class AgentRuntime:
     def _request_cancelled(self, request_id: str) -> bool:
         record = self.store.get_request(request_id)
         return record is not None and record.status == RequestStatus.CANCELLATION_REQUESTED
+
+    def _reclaim_expired_leases(self) -> None:
+        for request_id in self.store.reclaim_expired_leases():
+            self.activity_manager.log_event("request.reclaimed", {"request_id": request_id})
+
+    def _acquire_supervisor_lock(self) -> None:
+        if self._supervisor_lock_held:
+            return
+
+        lock_path = self.settings.supervisor_lock_path
+        payload = {
+            "agent_id": self.settings.agent_id,
+            "pid": os.getpid(),
+            "acquired_at": utc_now_iso(),
+        }
+        for attempt in range(2):
+            try:
+                fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            except FileExistsError:
+                if attempt == 0 and self._clear_stale_supervisor_lock():
+                    continue
+                raise RuntimeError(f"supervisor lock already held at {lock_path}: {self._read_supervisor_lock_owner()}") from None
+            else:
+                with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                    handle.write(json.dumps(payload, indent=2))
+                self._supervisor_lock_held = True
+                self.activity_manager.log_event(
+                    "supervisor.lock.acquired",
+                    {"agent_id": self.settings.agent_id, "lock_path": str(lock_path)},
+                )
+                return
+
+    def _clear_stale_supervisor_lock(self) -> bool:
+        lock_path = self.settings.supervisor_lock_path
+        owner = self._read_supervisor_lock_owner()
+        pid = owner.get("pid")
+        if not isinstance(pid, int) or self._pid_is_alive(pid):
+            return False
+        lock_path.unlink(missing_ok=True)
+        return True
+
+    def _read_supervisor_lock_owner(self) -> dict[str, Any]:
+        lock_path = self.settings.supervisor_lock_path
+        if not lock_path.exists():
+            return {}
+        try:
+            data = json.loads(lock_path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {"raw": data}
+        except json.JSONDecodeError:
+            return {"raw": lock_path.read_text(encoding="utf-8")}
+
+    def _pid_is_alive(self, pid: int) -> bool:
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            return False
+        return True
+
+    def _release_supervisor_lock(self) -> None:
+        if not self._supervisor_lock_held:
+            return
+        lock_path = self.settings.supervisor_lock_path
+        self.activity_manager.log_event(
+            "supervisor.lock.released",
+            {"agent_id": self.settings.agent_id, "lock_path": str(lock_path)},
+        )
+        lock_path.unlink(missing_ok=True)
+        self._supervisor_lock_held = False
 
     async def _write_runtime_state(self) -> None:
         self.activity_manager.write_runtime_state(

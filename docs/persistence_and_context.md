@@ -2,15 +2,12 @@
 
 ## 1. Principle
 
-Codex context is disposable cache.
-Filesystem state is the durable truth.
+Codex context is disposable cache. Filesystem and SQLite state are the durable truth.
+Everything required for restart recovery, inspection, or task switching must be persisted.
 
-All information required for task switching and restart recovery must be persisted under
-`.task-memory/`.
+## 2. Root layout
 
-## 2. Root Layout
-
-Recommended v0 layout:
+Production-ready v0 uses this canonical layout:
 
 ```text
 .task-memory/
@@ -35,9 +32,22 @@ Recommended v0 layout:
     <activity_id>/
       latest.jsonl
       last_message.txt
+      stderr.log
+      metadata.json
 ```
 
-## 3. Activity Folder Contract
+## 3. Canonical sources
+
+Canonical state, in priority order:
+
+1. SQLite request/activity rows
+2. activity folders under `.task-memory/`
+3. `session_map.json`
+4. Codex JSONL/stderr artifacts for diagnosis
+
+Raw chat history or ad hoc notes outside `.task-memory/` are not canonical.
+
+## 4. Activity folder contract
 
 Each activity folder must contain:
 
@@ -51,7 +61,7 @@ Each activity folder must contain:
   logs/
 ```
 
-### 3.1 `state.json`
+### 4.1 `state.json`
 
 Machine-readable activity state.
 
@@ -67,18 +77,11 @@ Required fields:
 - `created_at`
 - `updated_at`
 
-Optional fields:
+### 4.2 `summary.md`
 
-- `deadline`
-- `assigned_peer`
-- `result_ref`
-- `error_ref`
+Human-readable compact summary.
 
-### 3.2 `summary.md`
-
-Human-readable compact summary for restart and inspection.
-
-Must answer:
+It must answer:
 
 - what this activity is
 - why it exists
@@ -86,11 +89,11 @@ Must answer:
 - what remains
 - what the next turn should do
 
-### 3.3 `checkpoint.json`
+### 4.3 `checkpoint.json`
 
 Compact restart payload.
 
-Recommended fields:
+Required or strongly expected fields:
 
 - `objective`
 - `current_plan`
@@ -100,17 +103,34 @@ Recommended fields:
 - `known_constraints`
 - `next_prompt_seed`
 
-### 3.4 `inbox.md`
+### 4.4 `inbox.md`
 
-Chronological notes or incoming context relevant to the activity.
+Compact chronological notes relevant to the activity. This is a working ledger, not a raw
+chat transcript.
 
-This is a compact working ledger, not a raw chat transcript.
+## 5. Runtime state files
 
-## 4. Queue Store
+`.task-memory/runtime/` must provide:
 
-`requests.sqlite` is the queue and index database.
+- `agent_state.json` — current runtime identity/status/session summary
+- `scheduler_state.json` — queue depth + currently scheduled request summary
+- `supervisor.lock` — exclusive runtime ownership marker
+- `event-log.jsonl` — append-only recent event stream for operator inspection
 
-Recommended tables:
+## 6. Codex artifact contract
+
+`.task-memory/codex/<activity_id>/` must persist:
+
+- `latest.jsonl` — raw Codex JSONL stream for the latest turn
+- `last_message.txt` — extracted final assistant message
+- `stderr.log` — subprocess stderr
+- `metadata.json` — at least `exit_code` and last update time
+
+## 7. Queue store contract
+
+`requests.sqlite` is the durable request/activity index.
+
+Required tables:
 
 - `requests`
 - `request_events`
@@ -118,44 +138,33 @@ Recommended tables:
 - `activity_requests`
 - `peers`
 
-### 4.1 `requests` table
+### 7.1 Requests table responsibilities
 
-Recommended columns:
+Must support storage for:
 
-- `request_id TEXT PRIMARY KEY`
-- `status TEXT NOT NULL`
-- `kind TEXT NOT NULL`
-- `priority INTEGER NOT NULL`
-- `source_json TEXT NOT NULL`
-- `summary TEXT NOT NULL`
-- `details_json TEXT NOT NULL`
-- `reply_json TEXT`
-- `namespace_hint TEXT`
-- `activity_id TEXT`
-- `lease_owner TEXT`
-- `leased_until TEXT`
-- `idempotency_key TEXT`
-- `created_at TEXT NOT NULL`
-- `updated_at TEXT NOT NULL`
+- request identity and status
+- source/reply/details payloads
+- `activity_id`
+- `lease_owner`
+- `leased_until`
+- `idempotency_key`
+- result and error payloads
+- created/updated timestamps
 
-### 4.2 `activities` table
+### 7.2 Activities table responsibilities
 
-Recommended columns:
+Must support storage for:
 
-- `activity_id TEXT PRIMARY KEY`
-- `kind TEXT NOT NULL`
-- `namespace TEXT NOT NULL`
-- `status TEXT NOT NULL`
-- `session_id TEXT`
-- `folder_path TEXT NOT NULL`
-- `summary_path TEXT NOT NULL`
-- `checkpoint_path TEXT NOT NULL`
-- `created_at TEXT NOT NULL`
-- `updated_at TEXT NOT NULL`
+- activity identity and namespace
+- activity status
+- `session_id`
+- filesystem paths for summary/checkpoint folders
+- checkpoint version
+- created/updated timestamps
 
-## 5. Session Mapping
+## 8. Session mapping
 
-`session_map.json` is a convenience index from activity to Codex session.
+`session_map.json` is a convenience index from activity to Codex session id.
 
 Example:
 
@@ -170,50 +179,30 @@ Example:
 }
 ```
 
-The database may also store this. The JSON file exists for quick inspection and recovery.
+## 9. Prompt header contract
 
-## 6. Prompt Header Contract
-
-Every Codex turn should be built from persisted state rather than from a full raw transcript.
-
-The fixed header should contain:
+Every Codex turn prompt must be regenerated from persisted state rather than from a raw
+transcript. The header should include:
 
 - agent identity and role
 - current queue summary
-- current activity objective
+- active activity objective
 - compact progress summary
 - pending next steps
 - important constraints
-- file locations for durable state
+- durable state file locations
 
-Detailed runtime construction rules are defined in [Runtime Loop](./runtime_loop.md).
+## 10. Recovery rules
 
-## 7. What Must Not Be Canonical
+On restart, recovery should consult the canonical sources in order and normalize interrupted
+work. If sources disagree, prefer the newer and more complete persisted state, not memory.
 
-These may exist, but are not the source of truth:
-
-- transient in-memory scheduler state
-- raw stdout of prior Codex runs
-- ad hoc notes outside `.task-memory/`
-- human memory of what happened previously
-
-## 8. Recovery Rules
-
-On restart, the runtime must reconstruct state in this order:
-
-1. queue database
-2. activity folders
-3. session map
-4. latest Codex JSONL logs if needed for diagnosis
-
-If these disagree, the order above wins unless a later source contains a newer timestamp and a
-clearly more complete state.
-
-## 9. Persistence Acceptance Criteria
+## 11. Persistence acceptance criteria
 
 The persistence model is correct if:
 
-1. an accepted request survives process restart
-2. an incomplete activity can be resumed from files alone
+1. accepted requests survive restart
+2. incomplete activities can be resumed from files alone
 3. a maintainer can inspect one activity folder and understand the next action
-4. free-time and request-driven activities use the same durable model
+4. request-driven and free-time activities share the same durable model
+5. runtime events and status are inspectable without chat history

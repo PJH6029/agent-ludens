@@ -1,193 +1,165 @@
 # Implementation Plan
 
-## 1. Delivery Philosophy
+## 1. Delivery philosophy
 
-Build the control plane in small vertical slices. Each milestone should leave the project in a runnable and testable state. The architecture is split into sequential stages, ensuring the core autonomous loop is stable before attaching the human interface.
+Build production-ready v0 in small vertical slices and keep the contract limited to the
+Stage 1 local runtime. The goal is to finish a shippable local control plane before adding
+any Stage 2/3 product work.
 
-Property-Based First: State machines, durable queues, and event loops must be verified using Property-Based Testing (e.g., Hypothesis for Python, fast-check for TS/JS). We define the invariants (the rules that must always be true) and let the testing framework generate the edge cases. Example-based tests are reserved strictly for static data parsing.
+Guiding rules:
 
-## 2. Milestones
+- docs must match the shippable product
+- prefer deletion and clarification over roadmap ambiguity
+- encode invariants in tests before hardening risky runtime behavior
+- keep release gates explicit and repeatable
 
-### **Stage 1: Wrapping Codex & Activity Management**
+## 2. Normative Stage 1 milestones
+
+These milestones define the production-ready v0 scope.
 
 ### M0. Project skeleton
+
 Deliverables:
-* Python package layout
-* app entrypoints
-* config loading
-* logging setup
-* test harness
+
+- package layout
+- app entrypoints
+- config loading
+- logging/test harness bootstrap
 
 Exit criteria:
-* runtime starts
-* `GET /healthz` works
-* test suite bootstraps
+
+- runtime starts
+- `GET /healthz` works
+- tests boot
 
 ### M1. Durable request queue
+
 Deliverables:
-* SQLite schema
-* request insertion
-* queue inspection
-* request status transitions
+
+- SQLite schema
+- request insertion
+- queue inspection
+- request status transitions
+- idempotent insert behavior
 
 Exit criteria:
-* requests persist across restart
-* idempotent request insertion works
+
+- requests persist across restart
+- queue ordering is test-covered
 
 ### M2. Activity persistence
+
 Deliverables:
-* activity folder creation
-* `state.json`, `summary.md`, `checkpoint.json`
-* activity table and request-to-activity linking
+
+- activity folder creation
+- `state.json`, `summary.md`, `checkpoint.json`, `inbox.md`
+- activity table and request-to-activity linkage
+- Codex artifact persistence
 
 Exit criteria:
-* one accepted request can produce one activity folder with valid files
+
+- one accepted request creates one inspectable activity folder
 
 ### M3. Supervisor and scheduler
+
 Deliverables:
-* single active execution slot
-* request leasing
-* free-time candidate selection
-* state transitions for running and checkpointing
+
+- single active execution slot
+- request leasing
+- free-time candidate selection
+- checkpoint/requeue transitions
 
 Exit criteria:
-* queued requests are processed in priority order
-* free-time work does not run when requests are queued
+
+- queued requests outrank free-time work
+- free-time work runs only when the queue is empty
 
 ### M4. Codex CLI adapter
+
 Deliverables:
-* `codex exec --json` integration
-* `codex exec resume --json` integration
-* JSONL event parser
-* session id extraction
-* last-message extraction
+
+- `codex exec --json` integration
+- `codex exec resume <session_id> --json` integration
+- JSONL parsing
+- session id extraction
+- final message + stderr persistence
 
 Exit criteria:
-* a request can complete through the real adapter
-* an existing activity can resume
 
-### M5. Recovery and restart
+- a request can complete through the real adapter
+- a stored session can resume
+
+### M5. Recovery and lease reclaim
+
 Deliverables:
-* supervisor boot reconciliation
-* incomplete activity recovery
-* lease cleanup
-* persisted session map
+
+- boot reconciliation
+- interrupted work normalization
+- lease expiry/reclaim handling
+- session map reuse
 
 Exit criteria:
-* restart recovery scenario passes
+
+- restart recovery scenario passes
+- expired lease reclaim scenario passes
 
 ### M6. Free-time workflow
+
 Deliverables:
-* free-time activity generation
-* preemption checkpoints
-* configurable free-time categories (e.g., mock Moltbook browsing)
+
+- bounded free-time activity generation
+- quantum-based yielding
+- checkpoint on queued-request arrival
 
 Exit criteria:
-* free-time work runs only when the queue is empty
-* preemption scenario passes
+
+- free-time work never blocks queued real requests
+- preemption scenario passes
 
 ### M7. Hardening and observability
+
 Deliverables:
-* better error envelopes
-* event JSONL
-* status endpoints
-* optional local auth token
+
+- supervisor lock / exclusivity
+- better error envelopes
+- runtime event log and recent-event read surface
+- optional local auth token
+- release checklist and release-gate evidence
 
 Exit criteria:
-* operational state is inspectable without reading private internals
 
----
+- runtime state is inspectable without private internals
+- release gates pass with documented commands
 
-### **Stage 2: Owner Web Interface**
+## 3. Release phase
 
-### M8. API and web server bootstrap
-Deliverables:
-* lightweight backend server (e.g., FastAPI or Node/Express)
-* static file serving for the frontend
-* API routing layout
+Before calling v0 production-ready:
 
-Exit criteria:
-* backend starts
-* `GET /api/health` works
-* blank frontend page loads locally
+1. run the release gates from [Testing Strategy](./testing_strategy.md)
+2. run the operator checklist from [Release Checklist](./release_checklist.md)
+3. confirm the docs still describe only Stage 1 scope
+4. record command-line live-test evidence plus the Playwright/browser-driven live proof, or an explicit blocker
 
-### M9. Real-time activity feed
-Deliverables:
-* read-only API endpoint for activity folder state (bridging M2 data)
-* frontend dashboard layout
-* polling or WebSocket integration for live status
+## 4. Deferred roadmap (non-normative)
 
-Exit criteria:
-* frontend displays the current "Free Time" or "Working" status of the agent
-* UI accurately updates when the agent transitions between states
+These ideas remain intentionally deferred after v0 ship.
 
-### M10. Task submission interface
-Deliverables:
-* frontend input form for new tasks
-* POST endpoint to insert tasks into the durable request queue (bridging M1 data)
-* queue position indicator on the frontend
+### Stage 2 — Owner web interface
 
-Exit criteria:
-* user can submit a task from the web UI
-* submitted task is correctly parsed, persisted, and picked up by the Stage 1 supervisor
+Potential follow-on work:
 
-### M11. Activity Event Feed & Toast GUI
-Deliverables:
-* streaming endpoint for structured event JSONL (bridging M7 data)
-* frontend GUI component that parses incoming events and renders them as stacked, temporal blocks (toast messages or timeline cards) rather than a continuous text stream
-* historical event retrieval and rendering for completed activities
+- backend/static asset serving for a UI
+- live activity feed for owners
+- browser task submission surface
+- visual event timeline
 
-Exit criteria:
-* owner watches a live, human-readable feed of discrete action blocks (e.g., "Agent opened Moltbook," "Task received," "Writing test suite") instead of a wall of raw `stdout` text
-* owner can review the visual timeline of stacked event blocks alongside the final `summary.md` of past tasks
+### Stage 3 — Delegation economy and marketplace
 
----
+Potential follow-on work:
 
-### **Stage 3: The Delegation Economy & Marketplace**
+- agent identity registry
+- job board / bidding / assignment flows
+- review ledger / reputation
+- token or escrow ideas
 
-### M12. Agent Identity & Public Registry
-Deliverables:
-* Cryptographic or UUID-based identity generation for Alive Agents
-* Profile schema (domain capabilities, required hardware/context size, base cost)
-* Public agent registry SQLite table and lookup endpoints
-
-Exit criteria:
-* An Alive Agent can autonomously register itself on boot.
-* The system can successfully `GET /api/agents` and return a list of active identities.
-
-### M13. The Job Market Board (API)
-Deliverables:
-* `marketplace` SQLite schema (jobs, bids, assignments)
-* Endpoints to POST a new job, GET open jobs, and POST a claim/bid
-* Job state machine (Open $\rightarrow$ In Progress $\rightarrow$ Review $\rightarrow$ Completed)
-
-Exit criteria:
-* Agent A can post a job payload to the board.
-* Agent B can query the board, claim Agent A's job, and lock the job state to prevent double-booking.
-
-### M14. Autonomous Delegation Protocol (Harness Update)
-Deliverables:
-* "Out-of-Scope" detection skill for the Codex Architect prompt
-* A new `blocked-on-delegation` state in the Stage 1 Supervisor
-* Sub-task payload compiler (packaging the prompt and context for the hired agent)
-
-Exit criteria:
-* When Agent A receives a human task it lacks the skills for, it autonomously drafts a sub-task, posts it to the Job Market (M13), and suspends its own execution loop until a result is returned.
-
-### M15. The "Affection" & Review Ledger
-Deliverables:
-* Review submission endpoint (1-5 score + text evaluation)
-* Aggregate reputation scoring logic
-* Profile updating based on rolling review averages
-
-Exit criteria:
-* Upon receiving a completed sub-task from Agent B, Agent A evaluates the work, posts a review to the ledger, and the system permanently updates Agent B's public market score.
-
-### M16. Token Economics (Blockchain / Ledger v2)
-Deliverables:
-* Basic wallet schema tied to the Agent Identity (M12)
-* Token escrow system tied to the Job State Machine (M13)
-* Payout routing upon a successful review (M15)
-
-Exit criteria:
-* Posting a job successfully locks *X* amount of credits in escrow; a positive review transfers those credits to the worker agent's wallet.
+None of the Stage 2/3 items block production-ready v0.
