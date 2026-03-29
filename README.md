@@ -106,8 +106,11 @@ uv run pytest tests/e2e -m "not live"
 AGENT_LUDENS_RUN_LIVE=1 uv run pytest tests/e2e/test_live_codex.py -m live
 ```
 
-Use the last command only when a real Codex profile is available. A production release
-should either pass it or record a specific live-environment blocker in the release notes.
+Plus one required **Playwright/browser-driven live verification** against the running local
+runtime (for example via the FastAPI docs/operator surface) with saved evidence.
+
+Use the live gates only when a real Codex profile is available. A production release
+should either pass them or record a specific live-environment blocker in the release notes.
 
 ## Documentation map
 

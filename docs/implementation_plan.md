@@ -138,7 +138,7 @@ Before calling v0 production-ready:
 1. run the release gates from [Testing Strategy](./testing_strategy.md)
 2. run the operator checklist from [Release Checklist](./release_checklist.md)
 3. confirm the docs still describe only Stage 1 scope
-4. record live-test evidence or an explicit live blocker
+4. record command-line live-test evidence plus the Playwright/browser-driven live proof, or an explicit blocker
 
 ## 4. Deferred roadmap (non-normative)
 

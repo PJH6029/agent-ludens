@@ -22,6 +22,9 @@ uv run pytest tests/e2e -m "not live"
 AGENT_LUDENS_RUN_LIVE=1 uv run pytest tests/e2e/test_live_codex.py -m live
 ```
 
+Plus one required **Playwright/browser-driven live verification** against a running local
+runtime, with saved browser evidence.
+
 Live verification is required for production sign-off when a real Codex profile is
 available. If the environment blocks it, record the blocker explicitly in release evidence.
 
@@ -100,6 +103,7 @@ Required live scenarios:
 1. adapter fresh turn + resume proof
 2. runtime request completion with persisted session id and artifacts
 3. final agreed live peer/runtime proof if the environment supports it
+4. a Playwright/browser-driven live verification path that exercises the running runtime from a browser surface
 
 ## 5. Live prerequisites
 
@@ -111,6 +115,7 @@ Required prerequisites:
 - `codex-cli 0.117.0` (or an intentionally updated, re-validated version)
 - a Codex profile that can complete non-interactive turns without new approval prompts
 - clean temporary `.task-memory/` roots for each live test
+- Playwright/browser tooling available for the browser-driven live proof
 
 ## 6. Scenario matrix
 
@@ -173,6 +178,12 @@ Required prerequisites:
 - verify recent events are visible via file/API surfaces
 - verify activity summary/checkpoint artifacts explain the next action
 
+### S10. Browser-driven live verification
+
+- start a real local runtime
+- use Playwright to exercise the browser-accessible operator surface
+- capture evidence that the runtime is reachable and returns live state through the browser path
+
 ## 7. Evidence checklist
 
 Release evidence should include:
@@ -182,6 +193,7 @@ Release evidence should include:
 - proof of peer accept+poll behavior with two runtimes
 - proof of supervisor exclusivity and lease reclaim behavior
 - confirmation that docs and actual commands match
+- saved browser evidence for the Playwright/browser-driven live proof
 
 ## 8. Deferred testing work
 

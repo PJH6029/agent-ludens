@@ -18,6 +18,7 @@ Confirm the release still targets **Stage 1 only**:
 - [ ] `uv sync` completed successfully
 - [ ] `codex-cli 0.117.0` (or intentionally re-validated replacement) is installed
 - [ ] real Codex profile is available for live verification, or a blocker is recorded
+- [ ] Playwright/browser tooling is available for the browser-driven live proof
 - [ ] clean `.task-memory/` root is available for verification runs
 
 ## 3. Static and automated gates
@@ -33,6 +34,9 @@ uv run pytest tests/e2e -m "not live"
 AGENT_LUDENS_RUN_LIVE=1 uv run pytest tests/e2e/test_live_codex.py -m live
 ```
 
+Also capture one required **Playwright/browser-driven live verification** artifact against the
+running local runtime.
+
 Checklist:
 
 - [ ] lint passes
@@ -41,6 +45,7 @@ Checklist:
 - [ ] integration tests pass
 - [ ] non-live e2e tests pass
 - [ ] live tests pass, or the blocker is explicitly documented
+- [ ] Playwright/browser-driven live verification evidence is captured
 
 ## 4. Contract checks
 
@@ -74,6 +79,7 @@ Confirm evidence exists for:
 - [ ] lease expiry / reclaim
 - [ ] supervisor exclusivity / lock contention
 - [ ] live fresh-turn + resume proof
+- [ ] Playwright/browser-driven live verification
 
 ## 7. Release notes
 
