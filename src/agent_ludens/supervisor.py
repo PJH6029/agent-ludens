@@ -387,9 +387,22 @@ class AgentRuntime:
         if cancelled:
             self.store.finalize_cancelled_request(request.request_id)
             self.store.update_activity(activity.activity_id, status=ActivityStatus.FAILED)
+            self.activity_manager.log_event(
+                "request.cancelled",
+                {"request_id": request.request_id, "activity_id": activity.activity_id},
+            )
             return
         self.store.requeue_request(request.request_id, activity.activity_id)
         self.store.update_activity(activity.activity_id, status=ActivityStatus.PENDING)
+        self.activity_manager.log_event(
+            "request.requeued",
+            {
+                "request_id": request.request_id,
+                "activity_id": activity.activity_id,
+                "session_id": activity.session_id,
+                "reason": "checkpoint",
+            },
+        )
         self.activity_manager.write_summary(
             activity,
             objective=request.summary,
@@ -517,6 +530,73 @@ class AgentRuntime:
     def _request_cancelled(self, request_id: str) -> bool:
         record = self.store.get_request(request_id)
         return record is not None and record.status == RequestStatus.CANCELLATION_REQUESTED
+
+    def _reclaim_expired_leases(self) -> None:
+        for request_id in self.store.reclaim_expired_leases():
+            self.activity_manager.log_event("request.reclaimed", {"request_id": request_id})
+
+    def _acquire_supervisor_lock(self) -> None:
+        if self._supervisor_lock_held:
+            return
+
+        lock_path = self.settings.supervisor_lock_path
+        payload = {
+            "agent_id": self.settings.agent_id,
+            "pid": os.getpid(),
+            "acquired_at": utc_now_iso(),
+        }
+        for attempt in range(2):
+            try:
+                fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            except FileExistsError:
+                if attempt == 0 and self._clear_stale_supervisor_lock():
+                    continue
+                raise RuntimeError(f"supervisor lock already held at {lock_path}: {self._read_supervisor_lock_owner()}") from None
+            else:
+                with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                    handle.write(json.dumps(payload, indent=2))
+                self._supervisor_lock_held = True
+                self.activity_manager.log_event(
+                    "supervisor.lock.acquired",
+                    {"agent_id": self.settings.agent_id, "lock_path": str(lock_path)},
+                )
+                return
+
+    def _clear_stale_supervisor_lock(self) -> bool:
+        lock_path = self.settings.supervisor_lock_path
+        owner = self._read_supervisor_lock_owner()
+        pid = owner.get("pid")
+        if not isinstance(pid, int) or self._pid_is_alive(pid):
+            return False
+        lock_path.unlink(missing_ok=True)
+        return True
+
+    def _read_supervisor_lock_owner(self) -> dict[str, Any]:
+        lock_path = self.settings.supervisor_lock_path
+        if not lock_path.exists():
+            return {}
+        try:
+            return json.loads(lock_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return {"raw": lock_path.read_text(encoding="utf-8")}
+
+    def _pid_is_alive(self, pid: int) -> bool:
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            return False
+        return True
+
+    def _release_supervisor_lock(self) -> None:
+        if not self._supervisor_lock_held:
+            return
+        lock_path = self.settings.supervisor_lock_path
+        self.activity_manager.log_event(
+            "supervisor.lock.released",
+            {"agent_id": self.settings.agent_id, "lock_path": str(lock_path)},
+        )
+        lock_path.unlink(missing_ok=True)
+        self._supervisor_lock_held = False
 
     async def _write_runtime_state(self) -> None:
         self.activity_manager.write_runtime_state(
