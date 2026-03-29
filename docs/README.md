@@ -14,7 +14,8 @@ Later agents should be able to use this docs set to:
 
 The current v0 decisions are intentionally concrete:
 
-- Language: Python 3.12 in the `agent-ludens` conda env
+- Language: Python 3.12 in the `agent-ludens` uv project
+  - NOTE: you must build a new uv project via uv init
 - Web stack: FastAPI + Uvicorn + Pydantic
 - Storage: SQLite plus filesystem checkpoints under `.task-memory/`
 - Codex integration: `codex exec --json` and `codex exec resume --json`
