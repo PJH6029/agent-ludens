@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, cast
 
 from httpx import AsyncClient
 
@@ -16,7 +16,7 @@ async def wait_for_request_completion(
     while asyncio.get_event_loop().time() < deadline:
         response = await client.get(f"/v1/requests/{request_id}")
         response.raise_for_status()
-        payload = response.json()
+        payload = cast(dict[str, Any], response.json())
         if payload["status"] in {"completed", "failed", "cancelled"}:
             return payload
         await asyncio.sleep(0.05)
