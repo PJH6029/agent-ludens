@@ -38,6 +38,7 @@ class ActivityManager:
                 json.dumps({"activities": {}}, indent=2),
                 encoding="utf-8",
             )
+        self.settings.event_log_path.touch(exist_ok=True)
 
     def activity_files(self, namespace: Namespace, activity_id: str) -> ActivityFiles:
         folder = (self.root / namespace.value / activity_id).resolve()
@@ -228,7 +229,13 @@ class ActivityManager:
             encoding="utf-8",
         )
 
+    def read_recent_events(self, *, limit: int = 50) -> list[dict[str, Any]]:
+        if limit <= 0 or not self.settings.event_log_path.exists():
+            return []
+        lines = [line for line in self.settings.event_log_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        return [cast(dict[str, Any], json.loads(line)) for line in lines[-limit:]]
+
     def log_event(self, event_type: str, payload: dict[str, Any]) -> None:
-        with (self.root / "runtime" / "event-log.jsonl").open("a", encoding="utf-8") as handle:
+        with self.settings.event_log_path.open("a", encoding="utf-8") as handle:
             event = {"type": event_type, "timestamp": utc_now_iso(), **payload}
             handle.write(json.dumps(event) + "\n")
