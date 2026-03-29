@@ -150,6 +150,7 @@ These ideas remain intentionally deferred after v0 ship.
 - backend/static asset serving for a UI
 - live activity feed for owners
 - visual event timeline
+- browser task submission surface (Human Request Form mapping to POST /v1/requests)
 
 ### Stage 3 — Delegation economy and marketplace
 

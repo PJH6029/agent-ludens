@@ -375,6 +375,25 @@
     border-bottom: 1px solid var(--border);
   }
 
+  .request-bar {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding: 0 0.25rem;
+  }
+  .request-bar .field-input {
+    flex: 1;
+    margin-bottom: 0;
+    padding: 0.6rem 1rem;
+    border-radius: 12px;
+  }
+  .request-bar .btn-launch {
+    width: auto;
+    padding: 0 1.25rem;
+    margin: 0;
+    border-radius: 12px;
+  }
+
   .feed-title {
     font-family: var(--font-head);
     font-size: 1rem;
@@ -707,6 +726,12 @@
       <span id="ticker-text">에이전트가 깨어나고 있습니다...</span>
     </div>
 
+    <!-- Human Request Bar -->
+    <div class="request-bar">
+      <input type="text" id="human-request-input" class="field-input" placeholder="에이전트에게 새 의뢰 하달..." onkeypress="handleRequestKey(event)">
+      <button class="btn-launch" onclick="submitHumanRequest()">전송</button>
+    </div>
+
     <div class="feed-list" id="feed-list">
       <!-- items injected here -->
     </div>
@@ -897,7 +922,58 @@ function launchApp() {
 }
 
 // ════════════════════════════════════════════
-//  LIFE ENGINE
+//  HUMAN REQUEST SUBMISSION
+// ════════════════════════════════════════════
+function handleRequestKey(event) {
+  if (event.key === 'Enter') {
+    submitHumanRequest();
+  }
+}
+
+async function submitHumanRequest() {
+  const inputEl = document.getElementById('human-request-input');
+  const summary = inputEl.value.trim();
+  if (!summary) return;
+
+  const payload = {
+    kind: "human_task",
+    priority: 50,
+    source: { type: "human", id: "ui" },
+    summary: summary,
+    details: { instructions: summary },
+    reply: { mode: "poll" }
+  };
+
+  try {
+    inputEl.disabled = true;
+    const res = await fetch('/v1/requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      inputEl.value = '';
+      addFeedItem({
+        text: `인간이 새 의뢰를 하달했습니다: "${summary}"`,
+        credit: 0,
+        tag: '의뢰등록',
+        icon: '👤'
+      }, false);
+    } else {
+      const err = await res.json();
+      alert(`요청 실패: ${err.error?.message || res.statusText}`);
+    }
+  } catch (err) {
+    alert(`네트워크 오류: ${err.message}`);
+  } finally {
+    inputEl.disabled = false;
+    inputEl.focus();
+  }
+}
+
+// ════════════════════════════════════════════
+//  LIFE ENGINE (POLLED)
 // ════════════════════════════════════════════
 let lastEventCount = 0;
 
