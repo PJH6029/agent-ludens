@@ -35,7 +35,7 @@ Validated against the locally installed Codex CLI on 2026-03-29:
 - Read [API Spec](./api_spec.md) and [Persistence And Context](./persistence_and_context.md) before touching data models.
 - Use [Implementation Plan](./implementation_plan.md) to choose the next delivery milestone.
 - Use [Testing Strategy](./testing_strategy.md) for unit, integration, and live-test execution.
-- Refer to [MANIFEST.md](./MANIFEST.md) for the background behind this project.
+- Refer to [Manifest](./MANIFEST.md) for the background behind this project.
 
 ## Suggested Workflow For Future Agents
 
