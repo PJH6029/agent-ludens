@@ -4,7 +4,7 @@ import sqlite3
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from agent_ludens.models import RequestCreate, RequestSource, RequestStatus
+from agent_ludens.models import RequestCreate, RequestKind, RequestSource, RequestStatus
 from agent_ludens.store import SQLiteStore
 from agent_ludens.utils import utc_now_iso
 
@@ -26,7 +26,7 @@ def test_lease_records_ttl_and_expired_leases_can_be_reclaimed(tmp_path: Path) -
     store = SQLiteStore(tmp_path / ".task-memory" / "requests.sqlite")
     accepted = store.insert_request(
         RequestCreate(
-            kind="human_task",
+            kind=RequestKind.HUMAN_TASK,
             priority=80,
             source=RequestSource(type="human", id="cli"),
             summary="Recover abandoned lease",

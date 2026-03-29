@@ -576,7 +576,8 @@ class AgentRuntime:
         if not lock_path.exists():
             return {}
         try:
-            return json.loads(lock_path.read_text(encoding="utf-8"))
+            data = json.loads(lock_path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {"raw": data}
         except json.JSONDecodeError:
             return {"raw": lock_path.read_text(encoding="utf-8")}
 

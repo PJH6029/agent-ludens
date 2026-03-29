@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from typing import Any
 
 import pytest
@@ -8,6 +9,7 @@ from httpx import ASGITransport, AsyncClient
 
 from agent_ludens.adapters import CodexAdapter
 from agent_ludens.app import create_app
+from agent_ludens.config import AgentSettings
 from agent_ludens.models import CodexTurnResult
 from agent_ludens.supervisor import AgentRuntime
 from tests.helpers import wait_for_request_completion
@@ -57,7 +59,7 @@ class RecoverThenResumeAdapter(CodexAdapter):
 
 
 @pytest.mark.asyncio
-async def test_recoverable_failure_reuses_persisted_session_id(settings_factory) -> None:
+async def test_recoverable_failure_reuses_persisted_session_id(settings_factory: Callable[..., AgentSettings]) -> None:
     settings = settings_factory(enable_supervisor=True, enable_free_time=False)
     adapter = RecoverThenResumeAdapter()
     runtime = AgentRuntime(settings, adapter=adapter)

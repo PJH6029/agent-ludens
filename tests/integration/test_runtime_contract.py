@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 
 import pytest
+from httpx import AsyncClient
 
 from agent_ludens.adapters import FakeCodexAdapter
+from agent_ludens.config import AgentSettings
 from agent_ludens.supervisor import AgentRuntime
 from tests.helpers import wait_for_request_completion
 
 
 @pytest.mark.asyncio
-async def test_runtime_events_endpoint_surfaces_recent_request_events(runtime_client) -> None:
+async def test_runtime_events_endpoint_surfaces_recent_request_events(runtime_client: tuple[AgentRuntime, AsyncClient]) -> None:
     runtime, client = runtime_client
     response = await client.post(
         "/v1/requests",
@@ -41,7 +44,9 @@ async def test_runtime_events_endpoint_surfaces_recent_request_events(runtime_cl
 
 
 @pytest.mark.asyncio
-async def test_supervisor_lock_enforces_single_runtime_per_task_memory_root(settings_factory) -> None:
+async def test_supervisor_lock_enforces_single_runtime_per_task_memory_root(
+    settings_factory: Callable[..., AgentSettings],
+) -> None:
     settings = settings_factory(enable_supervisor=True, enable_free_time=False)
     primary = AgentRuntime(settings, adapter=FakeCodexAdapter())
     contender = AgentRuntime(
