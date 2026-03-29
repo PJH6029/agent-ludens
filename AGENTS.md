@@ -1,3 +1,3 @@
-- Use `uv` for this project. Create a new one.
+- Use uv project manager to create dedicated virtualenv for the project via `uv init`
 - Use `docs/` as a project goal. Alaways refer this directory for the task.
 - Make commits regularly to modularity.
