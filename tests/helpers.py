@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+<<<<<<< HEAD
+=======
+from typing import Any, cast
+>>>>>>> a2e43e5 (omx(team): auto-checkpoint worker-2 [unknown])
 
 from httpx import AsyncClient
 
@@ -15,7 +19,7 @@ async def wait_for_request_completion(
     while asyncio.get_event_loop().time() < deadline:
         response = await client.get(f"/v1/requests/{request_id}")
         response.raise_for_status()
-        payload = response.json()
+        payload = cast(dict[str, Any], response.json())
         if payload["status"] in {"completed", "failed", "cancelled"}:
             return payload
         await asyncio.sleep(0.05)
