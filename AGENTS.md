@@ -1,1 +1,1 @@
-- Use `agent-ludens` conda env for the task.
+- Use uv project manager to create dedicated virtualenv for the project via `uv init`
