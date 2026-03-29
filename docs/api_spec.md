@@ -1,31 +1,31 @@
 # API Spec
 
-## 1. API Principles
+## 1. API principles
 
-- Loopback-only in v0: bind to `127.0.0.1`
+- loopback-only in v0: bind to `127.0.0.1`
 - JSON request and response bodies
-- Stable envelope shapes
-- Request acceptance must persist before returning success
+- stable envelope shapes
+- request acceptance must persist before returning success
+- human and peer callers use the same core request endpoints
 
 ## 2. Versioning
 
-All runtime endpoints use `/v1`.
+All runtime endpoints use `/v1`, except `GET /healthz`.
 
-## 3. Authentication Model For V0
+## 3. Authentication model
 
 Default mode:
 
 - loopback-only
-- no mandatory auth for local development
+- no auth token required
 
 Optional hardening mode:
 
-- require `X-Agent-Token`
-- configure token from environment or local config file
+- configure `AGENT_LUDENS_AUTH_TOKEN`
+- require `X-Agent-Token` on all endpoints except `/healthz`
+- peer callers must send the same header when the target runtime requires it
 
-The implementation should support both modes without changing endpoint shapes.
-
-## 4. Resource Model
+## 4. Resource model
 
 Core resources:
 
@@ -33,7 +33,7 @@ Core resources:
 - request
 - activity
 - peer
-- queue
+- recent event
 
 ## 5. Endpoints
 
@@ -52,7 +52,7 @@ Response:
 }
 ```
 
-### 5.2 Agent Info
+### 5.2 Agent info
 
 `GET /v1/agent`
 
@@ -66,7 +66,7 @@ Response fields:
 - `queue_depth`
 - `current_session_id`
 
-### 5.3 Queue Snapshot
+### 5.3 Queue snapshot
 
 `GET /v1/queue`
 
@@ -76,7 +76,7 @@ Response fields:
 - `leased_count`
 - `items`
 
-Each item summary:
+Queue item fields:
 
 - `request_id`
 - `kind`
@@ -85,7 +85,7 @@ Each item summary:
 - `created_at`
 - `source`
 
-### 5.4 Create Request
+### 5.4 Create request
 
 `POST /v1/requests`
 
@@ -99,9 +99,9 @@ Request body:
     "type": "human",
     "id": "local-cli"
   },
-  "summary": "Summarize recent literature on memory agents",
+  "summary": "Summarize recent runtime activity",
   "details": {
-    "instructions": "Prepare a short background memo for future work."
+    "instructions": "Reply with a compact summary."
   },
   "reply": {
     "mode": "poll"
@@ -126,7 +126,7 @@ Optional fields:
 - `namespace_hint`
 - `activity_id`
 
-Success response:
+Success response (`202 Accepted`):
 
 ```json
 {
@@ -136,7 +136,7 @@ Success response:
 }
 ```
 
-### 5.5 Request Detail
+### 5.5 Request detail
 
 `GET /v1/requests/{request_id}`
 
@@ -149,21 +149,27 @@ Response fields:
 - `source`
 - `summary`
 - `details`
+- `reply`
+- `deadline`
+- `namespace_hint`
 - `activity_id`
+- `lease_owner`
+- `leased_until`
+- `idempotency_key`
 - `result`
 - `error`
 - `created_at`
 - `updated_at`
 
-### 5.6 Cancel Request
+### 5.6 Cancel request
 
 `POST /v1/requests/{request_id}/cancel`
 
 Rules:
 
 - queued requests become `cancelled`
-- leased or running requests become `cancellation_requested`
-- the supervisor performs the actual stop or checkpoint
+- leased/running/checkpointing requests become `cancellation_requested`
+- the supervisor performs final checkpoint/cleanup and then records terminal state
 
 Response:
 
@@ -174,7 +180,7 @@ Response:
 }
 ```
 
-### 5.7 List Activities
+### 5.7 List activities
 
 `GET /v1/activities`
 
@@ -184,7 +190,9 @@ Query params:
 - `namespace`
 - `limit`
 
-### 5.8 Activity Detail
+Returns a list of activity detail objects.
+
+### 5.8 Activity detail
 
 `GET /v1/activities/{activity_id}`
 
@@ -200,13 +208,48 @@ Response fields:
 - `checkpoint_version`
 - `updated_at`
 
-### 5.9 List Peers
+### 5.9 Recent events
+
+`GET /v1/events`
+
+Purpose:
+
+- expose a small recent-event view backed by `.task-memory/runtime/event-log.jsonl`
+- avoid private SQLite or file spelunking for normal operator inspection
+
+Query params:
+
+- `limit` (default 50)
+- `activity_id` (optional filter)
+- `request_id` (optional filter)
+
+Response:
+
+```json
+{
+  "items": [
+    {
+      "timestamp": "2026-03-29T02:00:00Z",
+      "type": "request.leased",
+      "request_id": "req_01HQ...",
+      "activity_id": "act_01HQ...",
+      "payload": {
+        "lease_owner": "writer-7101"
+      }
+    }
+  ]
+}
+```
+
+Event records should remain append-only, compact, and human-readable.
+
+### 5.10 List peers
 
 `GET /v1/peers`
 
-Returns the configured peer list known to this agent.
+Returns the configured peer list.
 
-### 5.10 Register Peer
+### 5.11 Register peer
 
 `POST /v1/peers`
 
@@ -221,106 +264,72 @@ Request body:
 }
 ```
 
-This endpoint is optional in v0 if peers are file-configured. If implemented, it should persist
-the peer list locally.
+Response fields match the peer record.
 
-### 5.11 Send Peer Request
+## 6. Peer request contract (accept + poll)
 
-This is not a public endpoint shape difference. Peer-to-peer requests use the same
-`POST /v1/requests` contract as human requests, with a different `source.type`.
+Production-ready v0 peer flow:
 
-Peer source example:
+1. Agent A knows or registers Agent B's `base_url`.
+2. Agent A sends `POST /v1/requests` to Agent B with `source.type = "agent"`.
+3. Agent B returns `202 Accepted` and a new remote `request_id`.
+4. Agent A polls `GET /v1/requests/{request_id}` on Agent B until terminal.
+
+`source.reply_to` may be supplied for correlation metadata, but Agent B is not required to
+perform callback delivery in v0.
+
+Example agent request body:
 
 ```json
 {
-  "type": "agent",
-  "id": "planner-7102",
-  "reply_to": {
-    "base_url": "http://127.0.0.1:7102",
-    "request_id": "req_origin_123"
+  "kind": "agent_task",
+  "priority": 60,
+  "source": {
+    "type": "agent",
+    "id": "planner-7102",
+    "reply_to": {
+      "base_url": "http://127.0.0.1:7102",
+      "request_id": "req_origin_123"
+    }
+  },
+  "summary": "Write a peer response",
+  "details": {
+    "instructions": "Return a structured acknowledgement."
+  },
+  "reply": {
+    "mode": "poll"
   }
 }
 ```
 
-## 6. Schema Definitions
+## 7. Error model
 
-### 6.1 Request Status
-
-Allowed values:
-
-- `queued`
-- `leased`
-- `running`
-- `checkpointing`
-- `completed`
-- `failed`
-- `cancelled`
-- `cancellation_requested`
-
-### 6.2 Priority
-
-Integer range:
-
-- `0` to `100`
-
-Suggested bands:
-
-- `80-100`: urgent
-- `50-79`: normal request
-- `20-49`: background but user-visible
-- `0-19`: free-time work
-
-### 6.3 Request Kind
-
-Suggested v0 values:
-
-- `human_task`
-- `agent_task`
-- `preparation_task`
-- `community_task`
-- `maintenance_task`
-
-## 7. Error Envelope
-
-All non-2xx responses use:
+Errors use:
 
 ```json
 {
   "error": {
-    "code": "invalid_request",
-    "message": "priority must be between 0 and 100",
+    "code": "not_found",
+    "message": "Request req_123 was not found",
     "details": {}
   }
 }
 ```
 
-Recommended error codes:
+Representative codes:
 
 - `invalid_request`
+- `unauthorized`
 - `not_found`
 - `conflict`
-- `unauthorized`
-- `unavailable`
-- `internal_error`
+- `approval_blocked`
+- `codex_exec_failed`
 
-## 8. Idempotency Rules
+## 8. Deferred API surfaces
 
-If `idempotency_key` is provided, the server should:
+The following are explicitly deferred from v0:
 
-- return the original accepted request if the payload is equivalent
-- reject with `conflict` if the same key is reused with meaningfully different payload
-
-## 9. Streaming
-
-Do not introduce SSE or WebSocket APIs in v0.
-
-Polling is enough for v0 and keeps the runtime simpler.
-
-## 10. API Acceptance Criteria
-
-The API is correct for v0 if:
-
-1. requests are durable before acknowledgment
-2. request status can be inspected externally
-3. peer agents can submit the same request envelope humans use
-4. cancellation and activity inspection work without reading raw local files
+- owner-UI-specific routes
+- marketplace routes
+- public discovery/registry routes
+- streaming browser-facing event feeds

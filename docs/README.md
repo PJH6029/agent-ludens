@@ -1,61 +1,72 @@
 # Agent Ludens Docs
 
-This directory is the project contract for future agents.
+This directory is the **normative contract** for Agent Ludens production-ready v0.
+The contract is intentionally scoped to the **Stage 1 local runtime only**.
 
-The goal is to make the project implementable without re-deriving the design from chat history.
-Later agents should be able to use this docs set to:
+Use this docs set to:
 
-1. plan work
-2. implement features
-3. write code-level tests
-4. run live end-to-end tests
+1. understand the shipped v0 boundary
+2. implement or harden the Stage 1 runtime
+3. write tests and release evidence against one stable contract
+4. defer Stage 2/3 work without re-deriving what is required for v0
 
-## Decision Snapshot
+## Scope boundary
 
-The current v0 decisions are intentionally concrete:
+Production-ready v0 means:
 
-- Language: Python 3.12 in the `agent-ludens` uv project
-  - NOTE: you must build a new uv project via uv init
-- Web stack: FastAPI + Uvicorn + Pydantic
-- Storage: SQLite plus filesystem checkpoints under `.task-memory/`
-- Codex integration: `codex exec --json` and `codex exec resume --json`
-- Network model: loopback-only HTTP on `localhost:<port>`
-- Concurrency model: one active Codex turn at a time per agent instance
-- Peer communication model: HTTP request envelopes between local agents
+- one machine
+- loopback-only HTTP
+- one active Codex-driven activity at a time
+- SQLite-backed queue and activity records
+- `.task-memory/` as the durable source of truth
+- peer-to-peer request submission using accept+poll semantics
+- release gates for lint, typecheck, non-live tests, and opt-in live tests
 
-Validated against the locally installed Codex CLI on 2026-03-29:
+Production-ready v0 does **not** mean:
 
-- `codex-cli 0.114.0`
+- a web dashboard
+- marketplace delegation
+- tokens or wallets
+- multi-machine networking
+- any other Stage 2/3 roadmap work
 
-## How To Use These Docs
+## Current Codex CLI contract
 
-- Start with [Project Structure](./project_structure.md) for the concept.
-- Read [Product Spec](./product_spec.md) for scope, requirements, and acceptance criteria.
-- Read [Architecture](./architecture.md) and [Runtime Loop](./runtime_loop.md) before coding.
-- Read [API Spec](./api_spec.md) and [Persistence And Context](./persistence_and_context.md) before touching data models.
-- Use [Implementation Plan](./implementation_plan.md) to choose the next delivery milestone.
-- Use [Testing Strategy](./testing_strategy.md) for unit, integration, and live-test execution.
-- Refer to [Manifest](../MANIFEST.md) for the background behind this project.
+Validated locally on **March 29, 2026**:
 
-## Suggested Workflow For Future Agents
+- `codex-cli 0.117.0`
+- `codex exec --json <prompt>`
+- `codex exec resume <session_id> --json <prompt>`
 
-1. Confirm which milestone from [Implementation Plan](./implementation_plan.md) is in scope.
-2. Implement only the contracts needed for that milestone.
-3. Add or update tests from [Testing Strategy](./testing_strategy.md).
-4. Validate contract conformance against:
-   - [Product Spec](./product_spec.md)
-   - [API Spec](./api_spec.md)
-   - [Persistence And Context](./persistence_and_context.md)
-   - [Runtime Loop](./runtime_loop.md)
-5. Run live tests only after code-level tests pass.
+## How to use the docs
 
-## Document Index
+Recommended reading order:
 
-- [Project Structure](./project_structure.md): concept and framing
-- [Product Spec](./product_spec.md): goals, non-goals, requirements, success criteria
-- [Architecture](./architecture.md): system decomposition and design decisions
-- [API Spec](./api_spec.md): HTTP contracts and message schemas
-- [Persistence And Context](./persistence_and_context.md): `.task-memory/` layout and state contracts
-- [Runtime Loop](./runtime_loop.md): scheduler, preemption, prompt header, Codex adapter behavior
-- [Testing Strategy](./testing_strategy.md): unit, integration, end-to-end, and live tests
-- [Implementation Plan](./implementation_plan.md): milestone-by-milestone delivery plan
+1. [Project Structure](./project_structure.md)
+2. [Product Spec](./product_spec.md)
+3. [Architecture](./architecture.md)
+4. [API Spec](./api_spec.md)
+5. [Persistence And Context](./persistence_and_context.md)
+6. [Runtime Loop](./runtime_loop.md)
+7. [Testing Strategy](./testing_strategy.md)
+8. [Implementation Plan](./implementation_plan.md)
+9. [Release Checklist](./release_checklist.md)
+
+## Document index
+
+- [Project Structure](./project_structure.md): runtime framing and vocabulary
+- [Product Spec](./product_spec.md): product boundary, requirements, acceptance criteria
+- [Architecture](./architecture.md): component model and exclusivity rules
+- [API Spec](./api_spec.md): HTTP envelopes, status semantics, peer contract
+- [Persistence And Context](./persistence_and_context.md): canonical filesystem and SQLite contract
+- [Runtime Loop](./runtime_loop.md): scheduler, checkpointing, resume, shutdown, recovery
+- [Testing Strategy](./testing_strategy.md): release gates, scenario matrix, live prerequisites
+- [Implementation Plan](./implementation_plan.md): Stage 1 milestones and deferred roadmap
+- [Release Checklist](./release_checklist.md): final operator/release sign-off steps
+
+## Guiding rules
+
+- Prefer the smallest implementation that fully satisfies the Stage 1 contract.
+- Treat `.task-memory/` and SQLite as canonical state; model context is cache.
+- Keep docs aligned to shippable behavior, not aspirational roadmap work.
+- If a requirement is deferred, label it as deferred instead of leaving it ambiguous.
